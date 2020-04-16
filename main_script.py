@@ -21,9 +21,10 @@ import os, sys
 from datetime import datetime
 import numpy as np
 
-sys.path.append(r'C:\Users\jaspd\Google Drive\VU\AB3_AW\P5+P6_Bachelorthesis_Aardwetenschappen\Scripts\Final_Code')
 import read_write_functions as rw
-import plume_masking_functions as plmsk
+import masking_functions as mask
+import moving_window as window
+
 
 #--------------------
 # PARAMETERS
@@ -33,13 +34,16 @@ lon_min = 100
 lon_max = 160
 lat_min = -50
 lat_max = 0
+boundaries = [lat_min, lat_max, lon_min, lon_max]
 
 # Setting the target resolution to ~7x7km
 target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
-boundaries = [lat_min, lat_max, lon_min, lon_max]
+# Decide whether or not a land-sea mask will be applied
+apply_land_sea_mask = True
 
+# Setting the data working directory
 basepath = r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR\\'
 
 # Create a list with all files to apply the analysis on
@@ -67,6 +71,9 @@ for i, file in enumerate(files):
         output = rw.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
         upd = {i : output}
         daily_data.update(upd)
+        if apply_land_sea_mask == True:
+            daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
+            daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
 print('Finished reading data as np.array')
 
 #%%
@@ -78,7 +85,7 @@ print('Finished reading data as np.array')
 for day in daily_data:
     # Create a mask layer (1-0) for all enhancements, based on q-th percentile
     arr = np.copy(daily_data[day]['CO_ppb'])
-    outarr = plmsk.moving_window(arr, window=(100,100), step=20, treshold=0.95, q=0.95)
+    outarr = window.moving_window(arr, window=(100,100), step=20, treshold=0.95, q=0.95)
     daily_data[day].update({'plume_mask':outarr})
 # Function(inputs = np.array per day plus looking x days in the past?)
         # Returns masklayer, 1 (enhanced) and 0 (background)
