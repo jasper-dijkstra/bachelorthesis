@@ -8,7 +8,7 @@ The global mask is of shape (21600, 43200), equating to about 980 mB when
 saved without compression. This data can be compressed to 2.5 mb using numpy
 savez_compressed, making for a very compact package.
 
-
+Copyright (c) 2019 Todd Karin
 
 """
 

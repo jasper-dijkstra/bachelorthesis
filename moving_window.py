@@ -2,14 +2,17 @@
 """
 Created on Thu Apr 16 11:30:44 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
+
+This script contains a 2d moving window function over a np.ndarray
+
 """
 
 import numpy as np
 import masking_functions as mask
 from datetime import datetime
 
-def moving_window(arr, window = (100,100), step = 20, treshold = 0.5, q = 0.9):
+def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
     """
     
     Parameters
@@ -22,8 +25,6 @@ def moving_window(arr, window = (100,100), step = 20, treshold = 0.5, q = 0.9):
         The amount of pixels the window has to step. Default is 20
     treshold : float (0-1).
         percentage of minimum amount of windows a peak has to be detected in. Default is 0.5
-    q : float (0-1)
-        The q-th quantile a value has to be, to be considered a peak. Default is 0.9
 
     Returns
     -------
@@ -44,7 +45,9 @@ def moving_window(arr, window = (100,100), step = 20, treshold = 0.5, q = 0.9):
             count_frame = np.full((len(frame),len(frame[0])), 1) # Count frame
             
             # Analysis applied onto frame
-            frame = mask.identify_enhancements_with_quantile(frame, q)
+            #frame = mask.identify_enhancements_1(frame, q=0.9)
+            #frame = mask.identify_enhancements_2(frame, q=0.9)
+            frame = mask.identify_enhancements_3(frame, st_devs = 2)
             
             #Append the moving window to the count and field arrays:
             field[y:y+window[1],x:x+window[0]] = frame[0:window[1],0:window[0]] + field[y:y+window[1],x:x+window[0]]

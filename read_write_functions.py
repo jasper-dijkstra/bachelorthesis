@@ -149,7 +149,8 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
         #Calculate target pixel for the observation iobs
         ilon = np.int((lon_obs - lon_min)* nlon_t / delta_lon)
         ilat = np.int((lat_obs - lat_min)* nlat_t / delta_lat)
-    
+        
+        if COdata.at[iobs, target] > 2.5e3: continue
         field_t[ilat,ilon] += COdata.at[iobs, target]
         count_t[ilat,ilon] += 1
     
