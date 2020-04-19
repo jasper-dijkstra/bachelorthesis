@@ -57,13 +57,13 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     # Write to txt file
     day = daily_data_dict['day']
     month = daily_data_dict['month']
-    #year = daily_data_dict['year']
-    total = len(indices)
-    filename = coord_directory + 'Plume_coordinates_{}_{}.txt'.format(month, day)#, year)
+    year = daily_data_dict['year']
+    total = len(indices[0])
+    filename = coord_directory + 'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
     
     headerstring = """#----------------------------------------
 #----------------------------------------
-This file contains a list with coordinates of plumes on {}/{}/2018, between:
+This file contains a list with coordinates of plumes on {}/{}/{}, between:
 longitudes: [{}, {}] 
 latitudes: [{}, {}] 
 
@@ -73,7 +73,7 @@ Total amount of gridcells identified as plume: {}
              
 #----------------------------------------
 #----------------------------------------
-""".format(month, day, lon_min, lon_max, lat_min, lat_max, total)
+""".format(month, day, year, lon_min, lon_max, lat_min, lat_max, total)
     
     f = open(filename, 'w+')
     f.write(headerstring)
@@ -81,7 +81,7 @@ Total amount of gridcells identified as plume: {}
     for i in range(len(indices[0])):
         x = indices[1][i]
         y = indices[0][i]
-        f.write("\nLat: {}, Lon: {}, xCO: {}".format(lat[y, x], lon[y, x], field_t[y, x]))
+        f.write("\nLat: {}, Lon: {}, xCO: {} ppb".format(lat[y, x], lon[y, x], field_t[y, x]))
     f.close()
     
     return
@@ -123,7 +123,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     # Retrieving month, day and year
     day = daily_data_dict['day']
     month = daily_data_dict['month']
-    #year = daily_data_dict['year']
+    year = daily_data_dict['year']
     
     # Deciding on the nlon_t and nlat_t
     field_t = daily_data_dict['CO_ppb']
@@ -166,9 +166,8 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
-    fig.savefig(figue_directory + r'fig_{}_{}_{}.png'.format(figtype, month, day), bbox_inches='tight')
+    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}.png'.format(figtype, month, day, year), bbox_inches='tight')
     #print('figure saved at: {}'.format(saving_path))
-    # Logging message
     plt.close()
     
     return

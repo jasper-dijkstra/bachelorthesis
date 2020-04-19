@@ -10,7 +10,7 @@ This script contains a 2d moving window function over a np.ndarray
 
 import numpy as np
 import masking_functions as mask
-from datetime import datetime
+
 
 def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
     """
@@ -31,7 +31,6 @@ def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
     np.array of the same size as input arrays, but masked enhancements.
 
     """
-    start = datetime.now()
     
     # Define the np.arrays where the data has to be appended on
     field = np.zeros((len(arr),len(arr[0])))
@@ -60,7 +59,5 @@ def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
     field = field/count
     field[field >= treshold] = 1.
     field[field < treshold] = 0.
-    
-    print('Total elapsed time for moving window: {}'.format(datetime.now()-start))
     
     return field

@@ -17,14 +17,14 @@ This script detects CO plumes in TROPOMI data
 #--------------------
 # IMPORTING FUNCTIONS
 #--------------------
-import os, sys
+import os
 from datetime import datetime
 import numpy as np
 
-import read_write_functions as rw
+import handling_input as inpt
+import handling_output as output
 import masking_functions as mask
 import moving_window as window
-import handling_output as output
 import utilities as ut
 
 
@@ -42,28 +42,24 @@ boundaries = [lat_min, lat_max, lon_min, lon_max]
 target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
-# Decide whether or not a land-sea mask will be applied
-gen_txt_plume_coord = False
-gen_fig_xCO = False
-gen_fig_plume = True
+# Decide what outputs have to be generated
+gen_txt_plume_coord = True # txt file with plume coordinates
+gen_fig_xCO = False # xCO figure
+gen_fig_plume = True # masked plume figure
 
+# Decide whether or not land-sea mask and/or GEFD data needs to be implemented
 apply_land_sea_mask = True
 apply_GEFD_data = True
 
 # Setting the data working directory
-basepath = r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR\\'
+basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
 
 # Create a list with all files to apply the analysis on
-input_csvs_dir = os.path.join(basepath + r'00_daily_csv\\')
-files = []
-for file in os.listdir(input_csvs_dir):
-    if len(files) == 4: break # Limit the amount of input days
-    if file.endswith(".csv"): files.append(os.path.join(input_csvs_dir + file))
-    else:
-        continue
+input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
+
 
 #%%
-
 #--------------------
 # Initialization
 #--------------------
@@ -73,13 +69,16 @@ start = datetime.now()
 # Reading daily csv files for specified area and day as np.arrays
 daily_data = {}
 for i, file in enumerate(files):
-        array = rw.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
+        array = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
         upd = {i : array}
         daily_data.update(upd)
         if apply_land_sea_mask == True:
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
             daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
-print('Finished reading data as np.array')
+            
+print('Total time elapsed reading data: {}'.format(datetime.now()-start))
+
+
 
 #%%
 #--------------------
@@ -88,7 +87,7 @@ print('Finished reading data as np.array')
 
 
 for day in daily_data:
-    # Create a mask layer (1-0) for all enhancements, based on q-th percentile
+    # Create a plume mask layer:
     arr = np.copy(daily_data[day]['CO_ppb'])
     outarr = window.moving_window(arr, window=(100,100), step=20, treshold=0.95)
     daily_data[day].update({'plume_mask':outarr})

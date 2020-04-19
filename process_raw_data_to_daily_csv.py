@@ -10,11 +10,9 @@ This script:
     
 """
 
-import os, sys
+import os
 from datetime import datetime
-
-sys.path.append(r'C:\Users\jaspd\Google Drive\VU\AB3_AW\P5+P6_Bachelorthesis_Aardwetenschappen\Scripts\Final_Code')
-import read_write_functions as rw
+import handling_input as inpt
 
 
 # Set the Target Boundaries (degrees)
@@ -42,7 +40,7 @@ out_csv_file = os.path.join(basepath + 'tropomi_co_Australia_nov18.csv')
 # Filter all data that falls within bbox
 filtered = []
 for file in csvs:
-    out_data = rw.filter_csv_by_bbox(file, boundaries)
+    out_data = inpt.filter_csv_by_bbox(file, boundaries)
     filtered.append(out_data)
 
 # Create one list that contains all grid cell-lists
@@ -51,7 +49,7 @@ for sublist in filtered:
     for cell in sublist:
         merged_lists.append(cell)
 
-rw.export_as_csv(out_csv_file, merged_lists)
+inpt.export_as_csv(out_csv_file, merged_lists)
 print('finished merging csv files at: {}'.format(datetime.now()))
 
 
@@ -66,9 +64,9 @@ days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 2
 
 
 for day in days:
-    csv_day = rw.filter_csv_by_day(out_csv_file, day)
+    csv_day = inpt.filter_csv_by_day(out_csv_file, day)
     exp_path = os.path.join(basepath + 'tropomi_co_Australia_{}_nov18.csv'.format(day))
-    rw.export_as_csv(exp_path, csv_day)
+    inpt.export_as_csv(exp_path, csv_day)
 
 print('finished filtering daily data at: {}'.format(datetime.now()))
 print('total time elapsed: {}'.format(datetime.now()-start))

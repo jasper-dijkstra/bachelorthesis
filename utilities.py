@@ -7,6 +7,7 @@ Created on Sun Apr 19 11:12:14 2020
 
 import os
 
+
 def DefineAndCreateDirectory(targetDirectory):
     # Check if directory exists, and else create it
     if not os.path.isdir(targetDirectory):
@@ -21,3 +22,20 @@ def DefineAndCreateDirectory(targetDirectory):
     return targetDirectory
 
 
+def ListCSVFilesInDirectory(inputDirectory, maxfiles=None):
+    # Check if directory exists, and else create it
+    if not os.path.isdir(inputDirectory):
+        print('This directory does not exist!')
+        # Add notification to logfile
+        return
+
+    files = []
+    for file in os.listdir(inputDirectory):
+        if maxfiles != None:
+            if len(files) == maxfiles: break # Limit the amount of input days
+        if file.endswith(".csv"): files.append(os.path.join(inputDirectory, file))
+        else:
+            continue
+    
+    return files
+    
