@@ -24,6 +24,8 @@ import numpy as np
 import read_write_functions as rw
 import masking_functions as mask
 import moving_window as window
+import handling_output as output
+import utilities as ut
 
 
 #--------------------
@@ -41,6 +43,10 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide whether or not a land-sea mask will be applied
+gen_txt_plume_coord = False
+gen_fig_xCO = False
+gen_fig_plume = True
+
 apply_land_sea_mask = True
 apply_GEFD_data = True
 
@@ -64,11 +70,11 @@ for file in os.listdir(input_csvs_dir):
 # Setting the time of starting the script
 start = datetime.now()
 
-# Reading daily csv files for specified area as np.arrays
+# Reading daily csv files for specified area and day as np.arrays
 daily_data = {}
 for i, file in enumerate(files):
-        output = rw.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
-        upd = {i : output}
+        array = rw.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
+        upd = {i : array}
         daily_data.update(upd)
         if apply_land_sea_mask == True:
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
@@ -97,13 +103,18 @@ for day in daily_data:
 
 #%%
 #--------------------
-# Creating Figures
+# Handling output
 #--------------------
 
 for day in daily_data:
-    saving_path = os.path.join(basepath + r'01_Figures/tropomi_co_mask_{}_{}.png'.format(daily_data[day]['month'], daily_data[day]['day']))
-    title = 'TROPOMI Atmospheric CO mask {} {} 2018'.format(daily_data[day]['month'], daily_data[day]['day'])
-    rw.generate_fig_from_data(bbox = [lat_min, lat_max, lon_min, lon_max], count_t = daily_data[day]['count_t'], field_t = daily_data[day]['plume_mask'], saving_path = saving_path, title=title)
-
+    if gen_txt_plume_coord == True:
+        coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_coordinates'))
+        output.NotePlumeCoordinates(daily_data[day], coord_dir)
+    if gen_fig_xCO == True:
+        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'xCO', title=None)
+    if gen_fig_plume == True:
+        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'mask', title=None)
 
 print('total time elapsed: {}'.format(datetime.now()-start))
