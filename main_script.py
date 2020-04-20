@@ -43,13 +43,13 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide what outputs have to be generated
-gen_txt_plume_coord = True # txt file with plume coordinates
+gen_txt_plume_coord = False # txt file with plume coordinates
 gen_fig_xCO = False # xCO figure
-gen_fig_plume = True # masked plume figure
+gen_fig_plume = False # masked plume figure
 
 # Decide whether or not land-sea mask and/or GEFD data needs to be implemented
-apply_land_sea_mask = True
-apply_GEFD_data = True
+apply_land_sea_mask = False
+apply_GFED_mask = True
 
 # Setting the data working directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
@@ -75,7 +75,10 @@ for i, file in enumerate(files):
         if apply_land_sea_mask == True:
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
             daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
-            
+        if apply_GFED_mask == True:
+            daily_data[i]['CO_ppb'] = mask.GFED_mask(daily_data[i], 'CO_ppb')
+            daily_data[i]['count_t'] = mask.GFED_mask(daily_data[i], 'count_t')
+
 print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 
 
