@@ -6,6 +6,7 @@ Created on Sun Apr 19 11:12:14 2020
 """
 
 import os
+from datetime import datetime
 
 
 def DefineAndCreateDirectory(targetDirectory):
@@ -38,4 +39,14 @@ def ListCSVFilesInDirectory(inputDirectory, maxfiles=None):
             continue
     
     return files
+
+def GetCurrentTime():
+    now = datetime.now()
+    year = now.strftime("%Y")
+    month = now.strftime("%m")
+    day = now.strftime("%d")
+    hour = now.strftime("%H")
+    minute = now.strftime("%M")
+    second = now.strftime("%S")
     
+    return {'year' : year, 'month' : month, 'day' : day, 'hour' : hour, 'minute' : minute, 'second' : second}

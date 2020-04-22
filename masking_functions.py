@@ -15,6 +15,7 @@ Functions:
 
 import numpy as np
 from global_land_mask import globe
+from GFED_fire_emissions_mask import hdf5_to_mask as gfed
 
 def land_sea_mask(array, boundaries):
     """
@@ -46,6 +47,46 @@ def land_sea_mask(array, boundaries):
     land_arr = mask * array
     
     return land_arr
+
+
+def GFED_mask(daily_data_dict, array_name):
+    
+    # Make sure array_name is correct
+    supported_arrays = ['CO_ppb', 'count_t']
+    if array_name not in supported_arrays:
+        print('array_name was not recognised by GFED_mask()')
+        # Write to logging file
+        return
+    
+    # Define lat/lon ranges of target
+    lat_min = daily_data_dict['lat_min']
+    lat_max = daily_data_dict['lat_max']
+    lon_min = daily_data_dict['lon_min']
+    lon_max = daily_data_dict['lon_max']
+    
+    # Define timescope
+    day = daily_data_dict['day']
+    month = daily_data_dict['month']
+    year = daily_data_dict['year']
+    
+    # Defining the lat and longitudinal ranges
+    latrange = np.linspace(lat_min, lat_max, len(daily_data_dict['CO_ppb']))
+    lonrange = np.linspace(lon_min, lon_max, len(daily_data_dict['CO_ppb'][0]))
+    
+    # Check for all lat/lon values if they correspond with wildfire emissions (1) or not (0)
+    hdf_tuple = gfed.read_hdf5(day, month, year)
+    
+    mask = []
+    array = daily_data_dict[array_name]
+    for lat in range(len(latrange)):
+        column = gfed.is_wildfire(hdf_tuple, latrange[lat], lonrange)
+        column = column.astype(int)
+        mask.append(column)
+    mask = np.array(mask)
+
+    mask = np.multiply(mask, array)
+    
+    return mask
 
 
 
