@@ -74,13 +74,14 @@ def GFED_mask(daily_data_dict, array_name):
     lonrange = np.linspace(lon_min, lon_max, len(daily_data_dict['CO_ppb'][0]))
     
     # Check for all lat/lon values if they correspond with wildfire emissions (1) or not (0)
+    hdf_tuple = gfed.read_hdf5(day, month, year)
+    
     mask = []
     array = daily_data_dict[array_name]
     for lat in range(len(latrange)):
-        #gfed.read_hdf5(day, month, year)
-        is_wildfire = gfed.is_wildfire(latrange[lat], lonrange, day, month, year)
-        is_wildfire = is_wildfire.astype(int)
-        mask.append(is_wildfire)
+        column = gfed.is_wildfire(hdf_tuple, latrange[lat], lonrange)
+        column = column.astype(int)
+        mask.append(column)
     mask = np.array(mask)
 
     mask = np.multiply(mask, array)

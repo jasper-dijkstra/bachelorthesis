@@ -44,8 +44,8 @@ target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide what outputs have to be generated
 gen_txt_plume_coord = False # txt file with plume coordinates
-gen_fig_xCO = False # xCO figure
-gen_fig_plume = False # masked plume figure
+gen_fig_xCO = True # xCO figure
+gen_fig_plume = True # masked plume figure
 
 # Decide whether or not land-sea mask and/or GEFD data needs to be implemented
 apply_land_sea_mask = False
