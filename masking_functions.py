@@ -8,7 +8,7 @@ This script contains functions that return as masks over TROPOMI CO data (or any
 
 Functions:
     1. land/sea mask
-    2. Carbon mask (TO BE MADE)
+    2. Carbon mask
     3. Plume mask (3 functions)
     
 """
@@ -50,9 +50,24 @@ def land_sea_mask(array, boundaries):
 
 
 def GFED_mask(daily_data_dict, array_name):
+    """
+    
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+    array_name : string
+        type of array to apply mask on ['CO_ppb', 'count_t', 'plume_mask'].
+
+    Returns
+    -------
+    mask : np.array
+        Array where all non-GFED carbon emissions data has been filtered out.
+
+    """
     
     # Make sure array_name is correct
-    supported_arrays = ['CO_ppb', 'count_t']
+    supported_arrays = ['CO_ppb', 'count_t', 'plume_mask']
     if array_name not in supported_arrays:
         print('array_name was not recognised by GFED_mask()')
         # Write to logging file
@@ -84,7 +99,8 @@ def GFED_mask(daily_data_dict, array_name):
         mask.append(column)
     mask = np.array(mask)
 
-    mask = np.multiply(mask, array)
+    mask = mask * array
+    mask[mask > 0] = 1
     
     return mask
 
@@ -135,6 +151,7 @@ def identify_enhancements_2(arr, q, st_devs = 1):
     arr[arr < 0] = 0 # Change all negative values to 0
     arr[arr > 0] = 1 # Change all enhancements to 1
     return arr
+
 
 def identify_enhancements_3(arr, st_devs=1):
     """

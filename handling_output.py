@@ -14,6 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 
+import utilities as ut
 
 
 def NotePlumeCoordinates(daily_data_dict, coord_directory):
@@ -58,11 +59,15 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     day = daily_data_dict['day']
     month = daily_data_dict['month']
     year = daily_data_dict['year']
+    curr_time = ut.GetCurrentTime()
     total = len(indices[0])
-    filename = coord_directory + 'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
+    filename = coord_directory + \
+        'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
     
     headerstring = """#----------------------------------------
 #----------------------------------------
+This file was automatically generated at: {}/{}/{} {}:{}
+
 This file contains a list with coordinates of plumes on {}/{}/{}, between:
 longitudes: [{}, {}] 
 latitudes: [{}, {}] 
@@ -73,7 +78,9 @@ Total amount of gridcells identified as plume: {}
              
 #----------------------------------------
 #----------------------------------------
-""".format(month, day, year, lon_min, lon_max, lat_min, lat_max, total)
+""".format(curr_time['year'], curr_time['month'], curr_time['day'], \
+    curr_time['hour'], curr_time['minute'], month, day, year, \
+        lon_min, lon_max, lat_min, lat_max, total)
     
     f = open(filename, 'w+')
     f.write(headerstring)
@@ -166,7 +173,9 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
-    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}.png'.format(figtype, month, day, year), bbox_inches='tight')
+    curr_time = ut.GetCurrentTime()
+    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
+            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
     #print('figure saved at: {}'.format(saving_path))
     plt.close()
     
