@@ -155,12 +155,16 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     
     # Deciding what data will be plotted
     if figtype == 'xCO':
+        # Add coastlines
+        land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
+        
         cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
         cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
         cb.set_label('ppb')
+        #ax.coastlines()
     
-    # IMPROVE VISUALISATION OF MASK!
     elif figtype == 'mask':
         # Load topographical features from cartopy
         rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
@@ -170,10 +174,10 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
         lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
         
         # Add the topographical features to the map
-        ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) #cfeature.OCEAN
-        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) # highres cfeature.LAND, if edge k, don't need (cfeature.COASTLINE)
-        ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3) #'#AAAAAA'
-        ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) # '#AAAAAA'
+        ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
+        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
+        ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
+        ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
         ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
         ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
         ax.patch.set_facecolor('None')
@@ -182,16 +186,17 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
         colors = ['white', 'red']
         cmap = ListedColormap(colors)
         cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = cmap, transform=ccrs.PlateCarree())
-        #cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = plt.cm.get_cmap('Reds', 2), transform=ccrs.PlateCarree())
-        cbaxes = fig.add_axes([0.8, 0.75, 0.03, 0.05]) 
-        cb = plt.colorbar(cs, cax = cbaxes, orientation = 'vertical', label = 'label')
-        cb.set_label('no plume (0), plume (1)')
+        cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
+        cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
+        cb.set_ticks([0, 1])
+        cb.set_ticklabels(["no plume", "plume"])
+
     
     # Title in figure or not
     if title != None:
         plt.title(title)
     
-    ax.coastlines()
+    #ax.coastlines()
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure

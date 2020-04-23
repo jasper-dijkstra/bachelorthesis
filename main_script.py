@@ -43,7 +43,7 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide what outputs have to be generated
-gen_txt_plume_coord = True # txt file with plume coordinates
+gen_txt_plume_coord = False # txt file with plume coordinates
 gen_fig_xCO = True # xCO figure
 gen_fig_plume = True # masked plume figure
 
@@ -56,7 +56,7 @@ basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDI
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=1)
 
 
 #%%
