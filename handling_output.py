@@ -12,7 +12,9 @@ and to create figures of plume locations ('mask') or atmospheric CO concentratio
 import numpy.ma as ma
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 import utilities as ut
 
@@ -160,7 +162,27 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     
     # IMPROVE VISUALISATION OF MASK!
     elif figtype == 'mask':
-        cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = plt.cm.get_cmap('Reds', 2), transform=ccrs.PlateCarree())
+        # Load topographical features from cartopy
+        rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
+        land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+        ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
+        states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+        lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
+        
+        # Add the topographical features to the map
+        ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) #cfeature.OCEAN
+        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) # highres cfeature.LAND, if edge k, don't need (cfeature.COASTLINE)
+        ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3) #'#AAAAAA'
+        ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) # '#AAAAAA'
+        ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
+        ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
+        ax.patch.set_facecolor('None')
+        
+        # Creating the figure
+        colors = ['white', 'red']
+        cmap = ListedColormap(colors)
+        cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = cmap, transform=ccrs.PlateCarree())
+        #cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = plt.cm.get_cmap('Reds', 2), transform=ccrs.PlateCarree())
         cbaxes = fig.add_axes([0.8, 0.75, 0.03, 0.05]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'vertical', label = 'label')
         cb.set_label('no plume (0), plume (1)')

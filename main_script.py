@@ -44,12 +44,12 @@ target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide what outputs have to be generated
 gen_txt_plume_coord = True # txt file with plume coordinates
-gen_fig_xCO = False # xCO figure
+gen_fig_xCO = True # xCO figure
 gen_fig_plume = True # masked plume figure
 
 # Decide whether or not land-sea mask and/or GEFD data needs to be implemented
 apply_land_sea_mask = True
-apply_GFED_mask = True
+apply_GFED_mask = False
 
 # Setting the data working directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
@@ -69,8 +69,9 @@ start = datetime.now()
 # Reading daily csv files for specified area and day as np.arrays
 daily_data = {}
 for i, file in enumerate(files):
-        array = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
-        upd = {i : array}
+        # Should I add uncertainty of measurement?    
+        day_data = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
+        upd = {i : day_data}
         daily_data.update(upd)
         if apply_land_sea_mask == True:
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
@@ -95,13 +96,12 @@ for day in daily_data:
     # Check if all plumes correspond with modelled GFED data
     if apply_GFED_mask == True:
         daily_data[day]['plume_mask'] = mask.GFED_mask(daily_data[day], 'plume_mask')
-        daily_data[day]['count_t'] = mask.GFED_mask(daily_data[day], 'count_t')
-# Function(inputs = np.array per day plus looking x days in the past?)
-        # Returns masklayer, 1 (enhanced) and 0 (background)
+        #daily_data[day]['count_t'] = mask.GFED_mask(daily_data[day], 'count_t')
 
-# Rectangle om plumemask heen, en daarbinnen roteren
-
-# Now, use this in combination with wind rotation ->
+# Find center of plume (also, write this txt instead of every gridcell)
+# Draw rectangle around it, size depending on size plume (find ideal size)
+# Rotate within rectangle, so plume will be alligned with wind direction
+# Reference this with plumes we found at other days???
 
 
 
