@@ -122,9 +122,9 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     day = COdata.at[0, 'day']
     month = COdata.at[0, 'month']
     # Create dict form Julian Date to UTC
-    year_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
-    year = year_dict['year']
-
+    #year_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
+    #year = year_dict['year']
+    year = 2018
         
     target = 'xco_ppb' # Set target for map creation
     

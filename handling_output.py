@@ -11,6 +11,7 @@ and to create figures of plume locations ('mask') or atmospheric CO concentratio
 
 import numpy.ma as ma
 import numpy as np
+from scipy import ndimage
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 import cartopy.crs as ccrs
@@ -46,11 +47,15 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     nlon_t = len(field_t[0])
     nlat_t = len(field_t)
     
-    # Check the indices where a plume is detected
+    # Get the indices of center of plume
     plume_mask = daily_data_dict['plume_mask']
-    indices = np.where(plume_mask == 1)
-    #mask = (plume_mask == 0)
-    #field_mt = ma.array(field_t, mask=mask)
+    #indices = np.where(plume_mask == 1) 
+    plumes = plume_mask > 0 # Define data to be labelled
+    labels, nlabels = ndimage.label(plumes) # Label data
+    indices = ndimage.center_of_mass(plume_mask, labels, np.arange(nlabels) + 1) # Define center of mass of labeled plumes
+    max_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
+    mean_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
+    plume_size = ndimage.labeled_comprehension(plume_mask, labels, np.arange(nlabels) + 1, np.sum, float, 0)
     
     # Generate coordinate meshgrid
     lon_t = np.linspace(lon_min, lon_max, nlon_t)
@@ -62,7 +67,7 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     month = daily_data_dict['month']
     year = daily_data_dict['year']
     curr_time = ut.GetCurrentTime()
-    total = len(indices[0])
+    total = len(indices)
     filename = coord_directory + \
         'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
     
@@ -70,16 +75,22 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
 #----------------------------------------
 This file was automatically generated at: {}/{}/{} {}:{}
 
-This file contains a list with coordinates of plumes on {}/{}/{}, between:
+This file contains a list with information on Carbon Monoxide plumes at {}/{}/{}, between:
 longitudes: [{}, {}] 
 latitudes: [{}, {}] 
 
-All listed coordinates give the center of a gridcel of ~7x7km
+column descriptions:
+- latitude:     Latitude of center of plume
+- longitude:    Longitude of center of plume
+- grid_cells:   Amount of grid cells (~7x7km) in plume
+- CO_max:       Highest Carbon Monoxide concentration measured in plume (ppb)
+- CO_average:   Average Carbon Monoxide concentration measured in plume (ppb)
 
-Total amount of gridcells identified as plume: {}          
+Total amount of plumes identified: {}         
              
 #----------------------------------------
 #----------------------------------------
+latitude, longitude, grid_cells, CO_max, CO_average,
 """.format(curr_time['year'], curr_time['month'], curr_time['day'], \
     curr_time['hour'], curr_time['minute'], month, day, year, \
         lon_min, lon_max, lat_min, lat_max, total)
@@ -87,10 +98,12 @@ Total amount of gridcells identified as plume: {}
     f = open(filename, 'w+')
     f.write(headerstring)
 
-    for i in range(len(indices[0])):
-        x = indices[1][i]
-        y = indices[0][i]
-        f.write("\nLat: {}, Lon: {}, xCO: {} ppb".format(lat[y, x], lon[y, x], field_t[y, x]))
+    for i in range(len(indices)):
+        x = int(indices[i][1])
+        y = int(indices[i][0])
+        x_co_max = int(max_xco[i][1])
+        y_co_max = int(max_xco[i][0])
+        f.write("{}, {}, {}, {}, {},\n".format(lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
     f.close()
     
     return

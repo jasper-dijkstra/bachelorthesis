@@ -116,7 +116,7 @@ def ModifiedJulianDatetoUTC(mjd):
     import calendar
     import time
 
-    t2000 = calendar.timegm((2010, 1, 1, 0, 0, 0)) # seconds in epoch 1970 corresponding to 1 Jan 2000
+    t2000 = calendar.timegm((2010, 1, 1, 0, 0, 0)) # seconds in epoch 1970 corresponding to 1 Jan 2010
     if isinstance(mjd, (np.ndarray,list)): # if input is a vector
         is_scalar = False
         if isinstance(mjd,list):
