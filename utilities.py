@@ -115,8 +115,12 @@ def ModifiedJulianDatetoUTC(mjd):
     """
     import calendar
     import time
-
-    t2000 = calendar.timegm((2010, 1, 1, 0, 0, 0)) # seconds in epoch 1970 corresponding to 1 Jan 2010
+    
+    global t
+    global gmt
+    global t2010
+    
+    t2010 = calendar.timegm((2010, 1, 1, 0, 0, 0)) # seconds in epoch 1970 corresponding to 1 Jan 2010
     if isinstance(mjd, (np.ndarray,list)): # if input is a vector
         is_scalar = False
         if isinstance(mjd,list):
@@ -124,7 +128,7 @@ def ModifiedJulianDatetoUTC(mjd):
     else: # input is a scalar
         is_scalar = True
         mjd = np.array([mjd])  # convert to array
-    t = mjd * 86400.0 + t2000 # compute seconds since epoch 1970
+    t = mjd + t2010 # compute seconds since epoch 1970
     gmt = np.zeros((len(mjd),9), dtype=np.int) # initialise field for intermediate result
     fractional_year = np.zeros(len(mjd), dtype=np.double)
     day_of_year = np.zeros(len(mjd), dtype=np.double)
@@ -138,4 +142,3 @@ def ModifiedJulianDatetoUTC(mjd):
     else:
         result={"year":gmt[:,0],"month":gmt[:,1], "day":gmt[:,2], "hour":gmt[:,3], "minute":gmt[:,4], "second":gmt[:,5], "millisecond":np.round(np.array(t%1)*1000.0).astype(np.int), "fractional_year":fractional_year, "day_of_year":day_of_year}
     return result
-
