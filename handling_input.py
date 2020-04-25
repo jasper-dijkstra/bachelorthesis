@@ -13,12 +13,11 @@ This script contains standalone functions to:
 
 """
 
-from datetime import datetime
 import numpy as np
 import pandas as pd
 import csv
 
-reference_date = datetime(2010, 1, 1, 0, 0, 0)
+import utilities as ut
 
 #----------------------------------
 # FILTERING DATA FUNCTIONS
@@ -122,8 +121,9 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     # Retrieving day, month and year of dataset
     day = COdata.at[0, 'day']
     month = COdata.at[0, 'month']
-    seconds = reference_date.timestamp() + int(COdata.at[0, 'time'])
-    year = datetime.fromtimestamp(seconds).year
+    # Create dict form Julian Date to UTC
+    year_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
+    year = year_dict['year']
 
         
     target = 'xco_ppb' # Set target for map creation
