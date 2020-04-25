@@ -14,6 +14,7 @@ Functions:
 """
 
 import numpy as np
+import warnings
 from global_land_mask import globe
 from GFED_fire_emissions_mask import hdf5_to_mask as gfed
 
@@ -168,21 +169,29 @@ def identify_enhancements_3(arr, st_devs=1):
     Masked array (int32), the size of input array with enhancement (1) or not (0).
 
     """
+    
+    warnings.filterwarnings('error')
+    
+    
+    try:
+        # Step 1: Note the average and standard deviations for whole input array
+        arr[arr == 0] = np.nan # Change all zeros to 'nan' so they won't be taken into account
+        average = np.nanmean(arr)
+        stdev = st_devs*np.nanstd(arr) 
+        arr = np.nan_to_num(arr) # Change 'nan's' back to zeros
         
-    # Step 1: Note the average and standard deviations for whole input array
-    arr[arr == 0] = 'nan' # Change all zeros to 'nan' so they won't be taken into account
-    average = np.nanmean(arr)
-    stdev = st_devs*np.nanstd(arr) 
-    arr = np.nan_to_num(arr) # Change 'nan's' back to zeros
-    
-    # Step 2: Isolate values that are above average
-    arr[arr < average] = 0
-    #average_filtered_background = np.nanmean(filtered_background)
-    
-    # Step 3: Check with isolated values, if they are x st.devs higher than average (background)
-    arr[arr < average+stdev] = 0
+         # Step 2: Isolate values that are above average
+        arr[arr < average] = 0
+        #average_filtered_background = np.nanmean(filtered_background)
+        
+        # Step 3: Check with isolated values, if they are x st.devs higher than average (background)
+        arr[arr < average+stdev] = 0
+        
     
 
+    except Warning: # Is encountered above oceans, as there is no valid data
+        pass
+    
     arr = np.nan_to_num(arr) # Rechange all 'nan' values to 0
     arr[arr > 0] = 1 # Change all enhancements to 1 (masking them)
     return arr
