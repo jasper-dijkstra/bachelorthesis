@@ -12,7 +12,7 @@ import numpy as np
 import masking_functions as mask
 
 
-def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
+def MovingWindow(arr, window = (100,100), step = 20, treshold = 0.5):
     """
     
     Parameters
@@ -61,3 +61,37 @@ def moving_window(arr, window = (100,100), step = 20, treshold = 0.5):
     field[field < treshold] = 0.
     
     return field
+
+def CheckForSurroundings(arr, neighbors=1):
+    """
+    Checks for amount of direct neighbors (3x3 square) around each grid cell 
+
+    Parameters
+    ----------
+    arr : input array on which checks will be performed
+    neighbors : int between 0-9 (default = 1)
+        minimum amount of neighbors required to be considered a plume
+    
+    Returns
+    -------
+    arr : input array without grid cells with too few neighbors
+    neighbor : array of size arr, with the amount of neighbors of each grid cell
+
+    """
+    # Create array of size input array
+    neighbor = np.zeros(arr.shape, dtype=float)
+    
+    # Check for neighbours in {}-direction:
+    neighbor[:-1] += arr[1:]        # North
+    neighbor[:-1,1:] += arr[1:,:-1] # North East
+    neighbor[:,1:] += arr[:,:-1]    # East
+    neighbor[1:,1:] += arr[:-1,:-1] # South East
+    neighbor[1:] += arr[:-1]        # South
+    neighbor[1:,:-1] += arr[:-1,1:] # South West
+    neighbor[:,:-1] += arr[:,1:]    # West
+    neighbor[:-1,:-1] += arr[1:,1:] # North West
+    
+    # Removing nuisances by making sure there is at least one neighbour
+    arr[neighbor < neighbors] = 0
+        
+    return {'array' : arr, 'neighbors' : neighbor}

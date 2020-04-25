@@ -56,7 +56,7 @@ basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDI
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=1)
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
 
 
 #%%
@@ -90,8 +90,9 @@ print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 for day in daily_data:
     # Create a plume mask layer:
     arr = np.copy(daily_data[day]['CO_ppb'])
-    outarr = window.moving_window(arr, window=(100,100), step=20, treshold=0.95)
-    daily_data[day].update({'plume_mask':outarr})
+    outarr = window.MovingWindow(arr, window=(100,100), step=20, treshold=0.95)
+    out_dict = window.CheckForSurroundings(outarr, neighbors=2) # Make sure each plume has at least x neighbors
+    daily_data[day].update({'plume_mask':out_dict['array'], 'neighbors':out_dict['neighbors']})
     
     # Check if all plumes correspond with modelled GFED data
     if apply_GFED_mask == True:
