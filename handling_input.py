@@ -10,12 +10,15 @@ This script contains standalone functions to:
     3. reading csv as pandas dataframe
     4. reading csv as np.array
     5. export to csv file
+    6. read data from Global Fire Emissions Database (hdf5)
 
 """
 
+import os
 import numpy as np
 import pandas as pd
 import csv
+import h5py
 
 import utilities as ut
 
@@ -124,7 +127,6 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     # Create dict form Julian Date to UTC
     year_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
     year = year_dict['year']
-    #year = 2018
         
     target = 'xco_ppb' # Set target for map creation
     
@@ -183,5 +185,78 @@ def export_as_csv(csv_out_path, data):
     return
 
 
-
-
+def ReadGFED(daily_data_dict):
+    """
+    This function reads HDF5 data from the Global Fire Emissions Database (GFED),
+    and then resample it to the desired resolution. GFED data from 2017 onwards,
+    is only available as Beta version. Therefore this function makes no distinction
+    in plume intensity.
+    
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        dictionary containing daily_data per day [<day>].
+    
+    Returns
+    -------
+    array of same resoultion and scope as described in daily_data_dict, with GFED values
+    
+    """
+    
+    # STEP 1: OBTAIN DATA FROM DAILY_DATA_DICT
+    # Define lat/lon ranges of target
+    lat_min = daily_data_dict['lat_min']
+    lat_max = daily_data_dict['lat_max']
+    lon_min = daily_data_dict['lon_min']
+    lon_max = daily_data_dict['lon_max']
+    
+    # Define timescope
+    day = daily_data_dict['day']
+    month = daily_data_dict['month']
+    year = daily_data_dict['year']
+    
+    
+    # STEP 2: READ THE DATA FROM THE HDF5 FILE
+    # Get Path of current script
+    full_path = str(os.path.realpath('__file__'))
+    path, _ = os.path.split(full_path)
+    
+    # Navigate to the correct hdf5 folder
+    gfed_filename = str(path + r'\GFED_fire_emissions_mask\GFED4.1s_{}_beta.hdf5'.format(year))
+    f = h5py.File(gfed_filename, mode='r')
+    
+    # Get daily fire and lat/lon data from hdf5 file
+    monthly_data = f['/emissions/{}/C'.format(month)][:]
+    daily_fraction = f['/emissions/{}/daily_fraction/day_{}'.format(month, day)][:]
+    data = np.multiply(monthly_data, daily_fraction)
+    lat_hdf = f['/lat'][:]
+    lat_hdf = lat_hdf[:, 0]
+    lon_hdf = f['/lon'][:]
+    lon_hdf = lon_hdf[0]
+    
+    
+    # STEP 3: RESAMPLE TO TARGET RESOLUTION
+    # Defining the lat and longitudinal ranges of output
+    latrange = np.linspace(lat_min, lat_max, len(daily_data_dict['CO_ppb']))
+    lonrange = np.linspace(lon_min, lon_max, len(daily_data_dict['CO_ppb'][0]))
+    
+    gfed = list()
+    for iobs in range(len(latrange)):
+        
+        #Find observation coordinates
+        #lon_obs = lonrange
+        #lat_obs = latrange[iobs]
+                
+        #Calculate target pixel for the observation iobs
+        ilon = ((lonrange - lon_hdf[0]) / (lon_hdf[1] - lon_hdf[0])).astype('int')
+        ilat = ((latrange[iobs] - lat_hdf[0])/(lat_hdf[1]-lat_hdf[0])).astype('int')
+        
+        # Append data to correct lat/lon indices
+        gfed_row = data[ilat,ilon]
+        gfed.append(gfed_row)
+    gfed = np.array(gfed)
+    
+    # Set all values > 0 to 1
+    #gfed[gfed > 0] = 1
+    
+    return gfed

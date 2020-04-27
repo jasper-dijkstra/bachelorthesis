@@ -131,7 +131,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
 
     """
     
-    if figtype not in ['mask', 'xCO']:
+    if figtype not in ['plume_mask', 'CO_ppb', 'GFED_emissions', 'GFED_buffers']:
         print('figtype is not recognised, figure could not be created')
         # Add logging message
         return
@@ -148,7 +148,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     year = daily_data_dict['year']
     
     # Deciding on the nlon_t and nlat_t
-    field_t = daily_data_dict['CO_ppb']
+    field_t = daily_data_dict[figtype]
     nlon_t = len(field_t[0])
     nlat_t = len(field_t)
     
@@ -167,18 +167,23 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     ax = plt.axes(projection=ccrs.PlateCarree())
     
     # Deciding what data will be plotted
-    if figtype == 'xCO':
+    if figtype in ['CO_ppb', 'GFED_emissions']:
         # Add coastlines
         land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
         ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
         
-        cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
+        if figtype == 'CO_ppb':
+            cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
+            lab = '(ppb)'
+        elif figtype == 'GFED_emissions':
+            cs = plt.pcolormesh(lon, lat, field_t, cmap='rainbow', transform=ccrs.PlateCarree())
+            lab = '(g C / m^2)'
         cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
-        cb.set_label('ppb')
+        cb.set_label(lab)
         #ax.coastlines()
     
-    elif figtype == 'mask':
+    elif figtype in ['plume_mask', 'GFED_buffers']:
         # Load topographical features from cartopy
         rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
         land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
@@ -198,7 +203,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
         # Creating the figure
         colors = ['white', 'red']
         cmap = ListedColormap(colors)
-        cs = plt.pcolormesh(lon, lat, daily_data_dict['plume_mask'], cmap = cmap, transform=ccrs.PlateCarree())
+        cs = plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, transform=ccrs.PlateCarree())
         cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
         cb.set_ticks([0, 1])

@@ -43,13 +43,16 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Decide what outputs have to be generated
-gen_txt_plume_coord = True # txt file with plume coordinates
-gen_fig_xCO = False # xCO figure
-gen_fig_plume = True # masked plume figure
+gen_txt_plume_coord = False # txt file with plume coordinates
+gen_fig_xCO = False # figure with CO concentration (ppb)
+gen_fig_GFED = False # figure with GFED emissions (g C / m^2 / month)
+gen_fig_plume = False # masked plume figure
 
-# Decide whether or not land-sea mask and/or GEFD data needs to be implemented
+gen_fig_GFED_buffer = False
+
+# Decide whether or not land-sea mask and/or GFED data needs to be implemented
 apply_land_sea_mask = True
-apply_GFED_mask = False
+compare_with_GFED = True
 
 # Setting the data working directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
@@ -85,31 +88,35 @@ print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 #--------------------
 # Main Model
 #--------------------
-
+start_main = datetime.now()
 
 for day in daily_data:
     # Create a plume mask layer:
     arr = np.copy(daily_data[day]['CO_ppb'])
     outarr = window.MovingWindow(arr, window=(100,100), step=20, treshold=0.95)
-    out_dict = window.CheckForSurroundings(outarr, neighbors=2) # Make sure each plume has at least x neighbors
-    daily_data[day].update({'plume_mask':out_dict['array'], 'neighbors':out_dict['neighbors']})
+    neighbors = window.CheckSurroundings(outarr) # Identify neighbrs of each grid cell
+    outarr[neighbors < 1] = 0 # Removing nuisances by making sure there is at least one neighbour
+    daily_data[day].update({'plume_mask':outarr, 'neighbors':neighbors})
     
     # Check if all plumes correspond with modelled GFED data
-    if apply_GFED_mask == True:
-        daily_data[day]['plume_mask'] = mask.GFED_mask(daily_data[day], 'plume_mask')
-        #daily_data[day]['count_t'] = mask.GFED_mask(daily_data[day], 'count_t')
+    if compare_with_GFED == True:
+        gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
+        gfed_buffered = window.DrawBuffer(gfed_array, buffersize = 10) # Draw circular buffers around GFED plumes
+        outarr = daily_data[day]['plume_mask'] * gfed_buffered # Only allow plumes within buffersize
+        daily_data[day].update({'plume_mask':outarr, 'GFED_emissions':gfed_array, 'GFED_buffers':gfed_buffered})
 
 # Find center of plume (also, write this txt instead of every gridcell)
 # Draw rectangle around it, size depending on size plume (find ideal size)
 # Rotate within rectangle, so plume will be alligned with wind direction
 # Reference this with plumes we found at other days???
 
-
+print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
 
 #%%
 #--------------------
 # Handling output
 #--------------------
+start_end = datetime.now()
 
 for day in daily_data:
     if gen_txt_plume_coord == True:
@@ -117,9 +124,16 @@ for day in daily_data:
         output.NotePlumeCoordinates(daily_data[day], coord_dir)
     if gen_fig_xCO == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'xCO', title=None)
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'CO_ppb', title=None)
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'mask', title=None)
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'plume_mask', title=None)
+    if gen_fig_GFED == True:
+        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_emissions', title=None)
+    if gen_fig_GFED_buffer == True:
+        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_buffers', title=None)
 
+print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))

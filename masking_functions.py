@@ -49,9 +49,9 @@ def land_sea_mask(array, boundaries):
     
     return land_arr
 
-
+"""
 def GFED_mask(daily_data_dict, array_name):
-    """
+    
     
     Parameters
     ----------
@@ -65,7 +65,7 @@ def GFED_mask(daily_data_dict, array_name):
     mask : np.array
         Array where all non-GFED carbon emissions data has been filtered out.
 
-    """
+    
     
     # Make sure array_name is correct
     supported_arrays = ['CO_ppb', 'count_t', 'plume_mask']
@@ -104,7 +104,7 @@ def GFED_mask(daily_data_dict, array_name):
     mask[mask > 0] = 1
     
     return mask
-
+"""
 
 
 def identify_enhancements(frame_array, q):
@@ -182,16 +182,14 @@ def identify_enhancements_3(arr, st_devs=1):
         
          # Step 2: Isolate values that are above average
         arr[arr < average] = 0
-        #average_filtered_background = np.nanmean(filtered_background)
         
         # Step 3: Check with isolated values, if they are x st.devs higher than average (background)
         arr[arr < average+stdev] = 0
         
-    
-
     except Warning: # Is encountered above oceans, as there is no valid data
         pass
     
     arr = np.nan_to_num(arr) # Rechange all 'nan' values to 0
     arr[arr > 0] = 1 # Change all enhancements to 1 (masking them)
+    
     return arr

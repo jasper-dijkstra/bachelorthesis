@@ -62,19 +62,17 @@ def MovingWindow(arr, window = (100,100), step = 20, treshold = 0.5):
     
     return field
 
-def CheckForSurroundings(arr, neighbors=1):
+def CheckSurroundings(arr):
     """
     Checks for amount of direct neighbors (3x3 square) around each grid cell 
 
     Parameters
     ----------
     arr : input array on which checks will be performed
-    neighbors : int between 0-9 (default = 1)
-        minimum amount of neighbors required to be considered a plume
+
     
     Returns
     -------
-    arr : input array without grid cells with too few neighbors
     neighbor : array of size arr, with the amount of neighbors of each grid cell
 
     """
@@ -91,7 +89,73 @@ def CheckForSurroundings(arr, neighbors=1):
     neighbor[:,:-1] += arr[:,1:]    # West
     neighbor[:-1,:-1] += arr[1:,1:] # North West
     
-    # Removing nuisances by making sure there is at least one neighbour
-    arr[neighbor < neighbors] = 0
+    return neighbor
+
+
+
+
+def DrawBuffer(arr, buffersize):
+    """
+    Function to draw buffer around all grid cells with value > 0
+    
+    Parameters
+    ----------
+    arr : input array with values to draw buffers around (values > 0)
+    buffersize : amount of grid cells (~7x7km) the buffer should be
+
+    Returns
+    -------
+    buffer : array of size input array, with buffers drawn around all values > 0.
+        buffer value == 1
+
+    """
+    
+    # First create array the size of input, to draw buffers in
+    buffer = np.zeros(arr.shape)
+    
+    # Get indices from where buffers need to be drawn
+    y_indices, x_indices = np.where(arr > 0)
+    
+    # Loop over all x,y indices
+    for arr_index in range(len(y_indices)):
+        iy = y_indices[arr_index]
+        ix = x_indices[arr_index]
         
-    return {'array' : arr, 'neighbors' : neighbor}
+        x = 0 # start x-direction
+        y = buffersize # start y-direction
+        diameter = 3 - 2 * buffersize # 3 (outermost layers and center point) - diameter
+        
+        # keep drawing new circles until buffersize is reached:
+        while (x<=y): 
+            for i in range(0,x + 1):
+                # try-except clause to ensure working at edges of array
+                try:    
+                    buffer[ix+i,iy+y] = 1 #1st octant
+                    buffer[ix-i,iy+y] = 1 #2nd octant
+                    buffer[ix+i,iy-y] = 1 #3rd octant
+                    buffer[ix-i,iy-y] = 1 #4th octant
+                    buffer[ix+x,iy+i] = 1 #1st octant
+                    buffer[ix-x,iy+i] = 1 #2nd octant
+                    buffer[ix+x,iy-i] = 1 #3rd octant
+                    buffer[ix-x,iy-i] = 1 #4th octant
+                    buffer[ix+i,iy+x] = 1 #5th octant
+                    buffer[ix-i,iy+x] = 1 #6th octant
+                    buffer[ix+i,iy-x] = 1 #7th octant
+                    buffer[ix-i,iy-x] = 1 #8th octant
+                    buffer[ix+y,iy+i] = 1 #5th octant
+                    buffer[ix-y,iy+i] = 1 #6th octant
+                    buffer[ix+y,iy-i] = 1 #7th octant
+                    buffer[ix-y,iy-i] = 1 #8th octant
+                except IndexError:
+                    continue # Stop this loop when edge of map is reached
+            
+            # Update diameter to draw new circle
+            if (diameter < 0):
+                diameter = diameter + 4 * x + 6
+            else:
+                diameter = diameter + 4 * (x-y) + 10
+                y=y-1
+            x=x+1
+    
+    return buffer
+    
