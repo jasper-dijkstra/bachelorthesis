@@ -30,6 +30,7 @@ import os
 from datetime import datetime
 import numpy as np
 
+# Local imports
 import handling_input as inpt
 import handling_output as output
 import masking_functions as mask
@@ -39,7 +40,7 @@ import utilities as ut
 
 
 #--------------------
-# PARAMETERS
+# PARAMETERS (user input)
 #--------------------
 # Set the Target Boundaries (degrees)
 lon_min = 100
@@ -52,18 +53,21 @@ boundaries = [lat_min, lat_max, lon_min, lon_max]
 target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
-# Decide what outputs have to be generated
+# Apply operations:
+use_wind_rotations = True   # rotate plumes in wind direction to improve results
+apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
+compare_with_GFED = True    # compare TROPOMI data with modelled wildfires from GFED
+    
+# Outputs to be generated:
 gen_txt_plume_coord = False # txt file with plume coordinates
-gen_fig_xCO = False # figure with CO concentration (ppb)
-gen_fig_GFED = True # figure with GFED emissions (g C / m^2 / month)
-gen_fig_plume = False # masked plume figure
+gen_fig_xCO = True          # figure with CO concentration (ppb)
+gen_fig_plume = True        # masked plume figure
 
-gen_fig_GFED_buffer = False
+gen_fig_GFED = False         # figure with GFED emissions (g C / m^2 / month)
+gen_fig_GFED_buffer = False # 
 
-# Decide whether or not land-sea mask and/or GFED data needs to be implemented
-use_wind_rotations = True
-apply_land_sea_mask = True
-compare_with_GFED = False
+# Setting other parameters
+max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
 
 # Setting the data working directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
@@ -82,9 +86,8 @@ start = datetime.now()
 
 # Reading daily csv files for specified area and day as np.arrays
 daily_data = {}
-for i, file in enumerate(files):
-        # Should I add uncertainty of measurement?    
-        day_data = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat)
+for i, file in enumerate(files):    
+        day_data = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat, max_unc_ppb)
         upd = {i : day_data}
         daily_data.update(upd)
         if apply_land_sea_mask == True:
@@ -147,15 +150,14 @@ for day in daily_data:
     if gen_fig_xCO == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateFigue(daily_data[day], fig_dir, figtype = 'CO_ppb', title=None)
-
-# Is it really neccesary to plot these figures?
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateFigue(daily_data[day], fig_dir, figtype = 'plume_mask', title=None)
-    
+
+# Is it really neccesary to plot these figures?
     if gen_fig_GFED == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'v_wind', title=None)
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_emissions', title=None)
     
     
     if gen_fig_GFED_buffer == True:

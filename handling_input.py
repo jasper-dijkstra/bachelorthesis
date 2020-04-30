@@ -18,7 +18,7 @@ import os
 import numpy as np
 import pandas as pd
 import csv
-#import h5py
+import h5py
 
 import utilities as ut
 
@@ -96,7 +96,7 @@ def reading_csv_as_df(csv_file):
     return COdata
 
 
-def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
+def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     """
     
     Parameters
@@ -105,6 +105,9 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
         Path to input csv file.
     bbox : list
         List containing the minimum and maximum longitudes (x) and latitudes (y) for area of interest [lat_min, lat_max, lon_min, lon_max]
+    target_lon
+    target_lat
+    max_unc : maximum uncertainty in TROPOMI measurements
     
     Returns
     -------
@@ -129,7 +132,8 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     #hour = time_dict['hour'] # This can be an enhancement for meteodata!
     year = time_dict['year']
         
-    target = 'xco_ppb' # Set target for map creation
+    co_ppb = 'xco_ppb'      # Set target for map creation
+    uncertainty = 'xco_ppb_unc'
     
     # Target Resolution
     nlon_t=target_lon
@@ -138,6 +142,7 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     # Initiate arrays that save the observation totals for every pixel
     field_t = np.zeros((nlat_t,nlon_t))
     count_t = np.zeros((nlat_t,nlon_t))
+    unc_t = np.zeros((nlat_t,nlon_t))
     
     delta_lon = int(lon_max - lon_min) # Calculate Target Longitudal Range
     delta_lat = int(lat_max - lat_min) # Calculate Target Latitudal Range
@@ -153,13 +158,18 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
         ilon = np.int((lon_obs - lon_min)* nlon_t / delta_lon)
         ilat = np.int((lat_obs - lat_min)* nlat_t / delta_lat)
         
-        if COdata.at[iobs, target] > 2.5e3: continue
-        field_t[ilat,ilon] += COdata.at[iobs, target]
+        if COdata.at[iobs, co_ppb] > 2.5e3: continue
+        field_t[ilat,ilon] += COdata.at[iobs, co_ppb]
+        unc_t[ilat,ilon] += COdata.at[iobs, uncertainty]
         count_t[ilat,ilon] += 1
     
     idx = (count_t > 0)
     field_t[idx] = field_t[idx]/count_t[idx]
-    returndict = {'day':day, 'month':month, 'year':year,\
+    
+    # Removing data with a too high uncertainty
+    field_t[unc_t > max_unc] = np.nan
+    
+    returndict = {'day':day, 'month':month, 'year':year, 'uncertainty':unc_t,\
                   'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
                       'lat_max':lat_max, 'target_lon':nlon_t, 'target_lat':nlat_t,\
                           'count_t':count_t, 'CO_ppb':field_t}#, 'hour': hour}
