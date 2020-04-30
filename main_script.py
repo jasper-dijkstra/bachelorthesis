@@ -63,9 +63,6 @@ gen_txt_plume_coord = False # txt file with plume coordinates
 gen_fig_xCO = True          # figure with CO concentration (ppb)
 gen_fig_plume = True        # masked plume figure
 
-gen_fig_GFED = False         # figure with GFED emissions (g C / m^2 / month)
-gen_fig_GFED_buffer = False # 
-
 # Setting other parameters
 max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
 
@@ -149,20 +146,10 @@ for day in daily_data:
         output.NotePlumeCoordinates(daily_data[day], coord_dir)
     if gen_fig_xCO == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'CO_ppb', title=None)
+        output.CreateColorMap(daily_data[day], 'CO_ppb', fig_dir, labeltag = 'ppb')
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'plume_mask', title=None)
-
-# Is it really neccesary to plot these figures?
-    if gen_fig_GFED == True:
-        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_emissions', title=None)
-    
-    
-    if gen_fig_GFED_buffer == True:
-        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_buffers', title=None)
+        output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))

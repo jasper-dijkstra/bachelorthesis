@@ -167,7 +167,8 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     field_t[idx] = field_t[idx]/count_t[idx]
     
     # Removing data with a too high uncertainty
-    field_t[unc_t > max_unc] = np.nan
+    field_t[unc_t > max_unc] = 0
+    count_t[unc_t > max_unc] = 0
     
     returndict = {'day':day, 'month':month, 'year':year, 'uncertainty':unc_t,\
                   'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\

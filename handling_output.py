@@ -5,7 +5,7 @@ Created on Sun Apr 19 11:42:35 2020
 @author: Jasper Dijkstra edited from script from S. Houweling
 
 This script contains functions to store the coordinates of plumes in a textfile,
-and to create figures of plume locations ('mask') or atmospheric CO concentrations ('xCO')
+and to create discrete or continuous georeferenced figures of np.arrays
 
 """
 
@@ -110,119 +110,181 @@ latitude, longitude, grid_cells, CO_max, CO_average,
 
 
 
-
-def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
-    """
-    
-    Parameters
-    ----------
-    daily_data_dict : dictionary
-        daily_data[<day>], contains data about TROPOMI measurement per day.
-    figure_directory : string
-        directory where figures will be stored.
-    figtype : string
-        'mask' or 'xCO' depending on the type of figure you want to make.
-    title : string, optional
-        title of the figure. The default is None.
-
-    Returns
-    -------
-    saves figure in figure_directory.
-
-    """
-    
-    if figtype not in ['plume_mask', 'CO_ppb', 'GFED_emissions', 'GFED_buffers', 'u_wind', 'v_wind']:
-        print('figtype is not recognised, figure could not be created')
-        # Add logging message
-        return
-    
+def CreateTargetLatLonGrid(daily_data_dict, figtype):
     # Defining boundaries
     lat_min = daily_data_dict['lat_min']
     lat_max = daily_data_dict['lat_max']
     lon_min = daily_data_dict['lon_min']
     lon_max = daily_data_dict['lon_max']
     
-    # Retrieving month, day and year
-    day = daily_data_dict['day']
-    month = daily_data_dict['month']
-    year = daily_data_dict['year']
-    
-    # Deciding on the nlon_t and nlat_t
-    field_t = daily_data_dict[figtype]
-    nlon_t = len(field_t[0])
-    nlat_t = len(field_t)
-    
-    # make new masked array of valid averages
-    count_t = daily_data_dict['count_t']
-    mask = (count_t == 0)
-    field_mt = ma.array(field_t, mask=mask)
+    # Setting target lon- and latitude
+    nlon_t = len(daily_data_dict[figtype][0])
+    nlat_t = len(daily_data_dict[figtype])
     
     # Generate coordinate meshgrid
     lon_t = np.linspace(lon_min, lon_max, nlon_t)
     lat_t = np.linspace(lat_min, lat_max, nlat_t)
     lon, lat = np.meshgrid(lon_t, lat_t)
     
-    # plot with cartopy
+    return lon, lat
+
+
+
+def CreateMaskMap(daily_data_dict, figtype, figue_directory, title=None, \
+                  labels=["no plume", "plume"], colors=['white', 'red']):
+    """
+    
+    Fucntion to create a discrete color map of a 2D np.array
+    
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+        Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
+        and np.array with values to plot and count_t.
+    figtype : string
+        Name as in daily_data_dict of the np.array containing values to plot.
+    figue_directory : string
+        Directory where figures will be stored.
+    labels : list with strings, optional
+        Labels for each tick on colorbar. The default is ["no plume", "plume"].
+        NOTE! 'labels' must have the same length as 'colors'!
+    colors : list with strings, optional
+        colors for each tick on colorbar. The default is ['white', 'red'].
+        NOTE! 'colors' must have the same length as 'labels'!
+
+    Returns
+    -------
+    Map saved as png in figure_directory.
+
+    """
+    # Check if labels and colors have got the same lengths
+    if not len(labels) == len(colors):
+        print("Parameters 'labels' and 'colors' must have the same length!")
+        print("Setting to default: labels=[no plume, plume], colors=[white, red]")
+    
+    # Retrieving month, day and year
+    day = daily_data_dict['day']
+    month = daily_data_dict['month']
+    year = daily_data_dict['year']
+    
+    # Create a longitude and latitude np.meshgrid in target resolution
+    lon, lat = CreateTargetLatLonGrid(daily_data_dict, figtype)
+    
+    # Create cartopy plot
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
     
-    # Deciding what data will be plotted
-    if figtype in ['CO_ppb', 'GFED_emissions', 'u_wind', 'v_wind']:
-        # Add coastlines
-        land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
-        
-        if figtype == 'CO_ppb':
-            cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
-            lab = '(ppb)'
-        elif figtype == 'GFED_emissions':
-            cs = plt.pcolormesh(lon, lat, field_t, cmap='rainbow', transform=ccrs.PlateCarree())
-            lab = '(g C / m^2)'
-        cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
-        cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
-        cb.set_label(lab)
-        #ax.coastlines()
+    # Load topographical features from cartopy
+    rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
+    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+    ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
+    states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+    lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
     
-    elif figtype in ['plume_mask', 'GFED_buffers']:
-        # Load topographical features from cartopy
-        rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
-        land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-        ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
-        states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
-        lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
-        
-        # Add the topographical features to the map
-        ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
-        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
-        ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
-        ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
-        ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
-        ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
-        ax.patch.set_facecolor('None')
-        
-        # Creating the figure
-        colors = ['white', 'red']
-        cmap = ListedColormap(colors)
-        cs = plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, transform=ccrs.PlateCarree())
-        cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
-        cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
-        cb.set_ticks([0, 1])
-        cb.set_ticklabels(["no plume", "plume"])
+    # Add the topographical features to the map
+    ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
+    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
+    ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
+    ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
+    ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
+    ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
+    ax.patch.set_facecolor('None')
+    
+    # Creating the figure
+    cmap = ListedColormap(colors)
+    cs = plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, transform=ccrs.PlateCarree())
+    cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
+    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
+    cb.set_ticks([0, len(colors)-1])
+    cb.set_ticklabels(labels)
 
-    
     # Title in figure or not
     if title != None:
         plt.title(title)
+    else:
+        plt.title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day))
     
-    #ax.coastlines()
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
     curr_time = ut.GetCurrentTime()
     fig.savefig(figue_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
             curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
-    #print('figure saved at: {}'.format(saving_path))
     plt.close()
     
-    return
+    
+def CreateColorMap(daily_data_dict, figtype, figue_directory, masking=True, \
+                   labeltag='values', title=None):
+    """
+    
+    Fucntion to create a continuous color map of a 2D np.array
+    
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+        Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
+        and np.array with values to plot and count_t.
+    figtype : string
+        Name as in daily_data_dict of the np.array containing values to plot.
+    figue_directory : string
+        Directory where figures will be stored.
+    masking : bool, optional
+        DESCRIPTION. The default is True.
+    labeltag : string, optional
+        Tag for the colorbar of the plot (for example 'ppb' or '(g C / m^2)'.
+        The default is 'values'.
+    title : string, optional
+        Title to be given to the plot. The default is None.
+
+    Returns
+    -------
+    Map saved as png in figure_directory.
+
+    """
+
+    
+    # Retrieving month, day and year
+    day = daily_data_dict['day']
+    month = daily_data_dict['month']
+    year = daily_data_dict['year']
+    
+    # Create a longitude and latitude np.meshgrid in target resolution
+    lon, lat = CreateTargetLatLonGrid(daily_data_dict, figtype)
+    
+    # plot with cartopy
+    fig = plt.figure(figsize=(10,6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    
+    if masking == True:
+        # Masking all zero values
+        count_t = daily_data_dict['count_t']
+        mask = (count_t == 0)
+        field_mt = ma.array(daily_data_dict[figtype], mask=mask)
+    else:
+        field_mt = daily_data_dict[figtype]
+    
+    # Add some cartopy features to the map
+    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
+        
+    cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
+    cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
+    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
+    cb.set_label(labeltag)
+    
+    # Title in figure or not
+    if title != None:
+        plt.title(title)
+    else:
+        plt.title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day))
+
+    plt.ioff() # Preventing figures from appearing as pop-up
+    
+    # Saving figure
+    curr_time = ut.GetCurrentTime()
+    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
+            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    plt.close()  
 
