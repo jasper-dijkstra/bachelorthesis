@@ -18,7 +18,7 @@ import os
 import numpy as np
 import pandas as pd
 import csv
-import h5py
+#import h5py
 
 import utilities as ut
 
@@ -125,8 +125,9 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     day = COdata.at[0, 'day']
     month = COdata.at[0, 'month']
     # Create dict form Julian Date to UTC
-    year_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
-    year = year_dict['year']
+    time_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
+    #hour = time_dict['hour'] # This can be an enhancement for meteodata!
+    year = time_dict['year']
         
     target = 'xco_ppb' # Set target for map creation
     
@@ -158,7 +159,10 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat):
     
     idx = (count_t > 0)
     field_t[idx] = field_t[idx]/count_t[idx]
-    returndict = {'day':day, 'month':month, 'year':year, 'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min, 'lat_max':lat_max, 'target_lon':nlon_t, 'target_lat':nlat_t, 'count_t':count_t, 'CO_ppb':field_t}
+    returndict = {'day':day, 'month':month, 'year':year,\
+                  'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
+                      'lat_max':lat_max, 'target_lon':nlon_t, 'target_lat':nlat_t,\
+                          'count_t':count_t, 'CO_ppb':field_t}#, 'hour': hour}
     return returndict
 
 

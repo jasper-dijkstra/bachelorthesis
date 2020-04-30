@@ -131,7 +131,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
 
     """
     
-    if figtype not in ['plume_mask', 'CO_ppb', 'GFED_emissions', 'GFED_buffers']:
+    if figtype not in ['plume_mask', 'CO_ppb', 'GFED_emissions', 'GFED_buffers', 'u_wind', 'v_wind']:
         print('figtype is not recognised, figure could not be created')
         # Add logging message
         return
@@ -167,7 +167,7 @@ def CreateFigue(daily_data_dict, figue_directory, figtype, title=None):
     ax = plt.axes(projection=ccrs.PlateCarree())
     
     # Deciding what data will be plotted
-    if figtype in ['CO_ppb', 'GFED_emissions']:
+    if figtype in ['CO_ppb', 'GFED_emissions', 'u_wind', 'v_wind']:
         # Add coastlines
         land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
         ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 

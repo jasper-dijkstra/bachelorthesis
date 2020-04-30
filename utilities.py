@@ -2,7 +2,8 @@
 """
 Created on Sun Apr 19 11:12:14 2020
 
-@author: jaspd
+@author: Jasper Dijkstra + 2 functions from Bram Maasakkers
+
 """
 
 import os

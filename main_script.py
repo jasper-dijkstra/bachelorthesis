@@ -4,13 +4,22 @@ Created on Wed Apr  1 16:28:24 2020
 
 @author: Jasper Dijkstra
 
-This script detects CO plumes in TROPOMI data
+This algorithm detects Carbon Monoxide plumes in TROPOMI data
 
-1. Reading data as 2D np.arrays
-2. Separating enhancements in CO concentration from background
-3. Rotate plumes (if possible) with wind direction, to find source
-4. Plot figures/return coordinates of plume locations 
+Edit the parameters section to tune the algorithm as desired.
 
+The rest of the script is built up as follows:
+    - INITIALIZATION:
+        TROPOMI data is processed to np.arrays
+        If desired, measurements above oceans can be filtered out 
+        Data is stored in dictionaries (daily_data_dict)
+    - MAIN MODEL:
+        Using a moving window, highest values are separated from background
+        !wind rotations!
+        If desired, TROPOMI plumes can be compared to data from the Global Fire Emissions Database
+    - HANDLING OUTPUT:
+        If desired, textfiles containing plume coordinates are generated
+        If desired, figures are generated
 
 """
 
@@ -25,6 +34,7 @@ import handling_input as inpt
 import handling_output as output
 import masking_functions as mask
 import moving_window as window
+import fetching_winddata as ERA5
 import utilities as ut
 
 
@@ -45,14 +55,15 @@ target_lat = int(abs((lat_max-lat_min)/(7/110)))
 # Decide what outputs have to be generated
 gen_txt_plume_coord = False # txt file with plume coordinates
 gen_fig_xCO = False # figure with CO concentration (ppb)
-gen_fig_GFED = False # figure with GFED emissions (g C / m^2 / month)
+gen_fig_GFED = True # figure with GFED emissions (g C / m^2 / month)
 gen_fig_plume = False # masked plume figure
 
 gen_fig_GFED_buffer = False
 
 # Decide whether or not land-sea mask and/or GFED data needs to be implemented
+use_wind_rotations = True
 apply_land_sea_mask = True
-compare_with_GFED = True
+compare_with_GFED = False
 
 # Setting the data working directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
@@ -80,25 +91,35 @@ for i, file in enumerate(files):
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
             daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
 
+# collect meteodata via ECMWF CDS API:
+if use_wind_rotations == True:
+    downloaded_nc_path = ERA5.DownloadERA5(daily_data, pressure_level=850)
+    daily_data = ERA5.ProcessMeteo(daily_data, downloaded_nc_path)
+
 print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 
 
 
 #%%
 #--------------------
-# Main Model
+# MAIN MODEL
 #--------------------
 start_main = datetime.now()
 
+
+# Check for plumes based on three criteria:
 for day in daily_data:
-    # Create a plume mask layer:
+    # 1: At least 2 standard deviations above average of moving window
     arr = np.copy(daily_data[day]['CO_ppb'])
-    outarr = window.MovingWindow(arr, window=(100,100), step=20, treshold=0.95)
-    neighbors = window.CheckSurroundings(outarr) # Identify neighbrs of each grid cell
+    outarr = window.MovingWindow(arr, window=(100,100), step=20, treshold=0.95) # Apply moving Window operation
+    neighbors = window.CheckSurroundings(outarr) # Identify neighbors of each grid cell
     outarr[neighbors < 1] = 0 # Removing nuisances by making sure there is at least one neighbour
     daily_data[day].update({'plume_mask':outarr, 'neighbors':neighbors})
     
-    # Check if all plumes correspond with modelled GFED data
+    # 2: Rotate in the wind, to check if (center of) plumes overlap multiple days
+        # Wildfires tend to occur less than one day!
+    
+    # 3: Check if all plumes overlap with a buffer around modelled GFED data
     if compare_with_GFED == True:
         gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
         gfed_buffered = window.DrawBuffer(gfed_array, buffersize = 10) # Draw circular buffers around GFED plumes
@@ -114,10 +135,11 @@ print('Total time elapsed executing plume masking algorithm: {}'.format(datetime
 
 #%%
 #--------------------
-# Handling output
+# HANDLING OUTPUT
 #--------------------
 start_end = datetime.now()
 
+# Generate desired outputs based on earlier set preferences
 for day in daily_data:
     if gen_txt_plume_coord == True:
         coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_coordinates'))
@@ -125,12 +147,17 @@ for day in daily_data:
     if gen_fig_xCO == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateFigue(daily_data[day], fig_dir, figtype = 'CO_ppb', title=None)
+
+# Is it really neccesary to plot these figures?
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateFigue(daily_data[day], fig_dir, figtype = 'plume_mask', title=None)
+    
     if gen_fig_GFED == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-        output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_emissions', title=None)
+        output.CreateFigue(daily_data[day], fig_dir, figtype = 'v_wind', title=None)
+    
+    
     if gen_fig_GFED_buffer == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateFigue(daily_data[day], fig_dir, figtype = 'GFED_buffers', title=None)
