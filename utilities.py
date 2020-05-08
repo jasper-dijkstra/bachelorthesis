@@ -4,6 +4,15 @@ Created on Sun Apr 19 11:12:14 2020
 
 @author: Jasper Dijkstra + 2 functions from Bram Maasakkers
 
+This script contains functions to:
+    1. Check if directory exists, if not create it
+    2. List all csv files in directory
+    3. Get current time (year, month, day, hour, minute, second)
+    4. Convert UTC to modified Julian date 2010 ((C) Bram Maasakkers)
+    5. Convert modified Julian date 2010 to UTC ((C) Bram Maasakkers)
+    6. Reclassify np.array in daily_data_dict to specified resolution
+    7. Check CO concentration (in ppb) for given lat/lon combination
+
 """
 
 import os
@@ -59,7 +68,7 @@ def UTCtoModifiedJulianDate(year, month, day, hour, minute, second, millisecond=
     """
     FUNCTION BY BRAM MAASAKKERS (C)
     
-    Convert UTC (year, month, day, hour, minute, second[, millisecond]) to modified Julian date 2000
+    Convert UTC (year, month, day, hour, minute, second[, millisecond]) to modified Julian date 2010
     This function is vector-safe.
     
     Parameters:
@@ -148,7 +157,7 @@ def ModifiedJulianDatetoUTC(mjd):
 
 def ReclassArray(daily_data_dict, arraytype, lon_resolution = 7, lat_resolution = 7):
     """
-    
+    Reclassify np.array in daily_data_dict to specified resolution
 
     Parameters
     ----------
@@ -156,8 +165,8 @@ def ReclassArray(daily_data_dict, arraytype, lon_resolution = 7, lat_resolution 
         daily_data[<day>], contains data about TROPOMI measurement per day.
         Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
         and np.ndarray to be reclassified.
-    arraytype : string
-        key of ndarray in daily_data_dict containing values to be reclassified.
+    arraytype : np.array
+        key of np.ndarray in daily_data_dict containing values to be reclassified.
     lon_resolution : integer, optional
         grid cell target resolution (km) in longitudinal direction. The default is 7.
     lat_resolution : integer, optional
@@ -207,3 +216,43 @@ def ReclassArray(daily_data_dict, arraytype, lon_resolution = 7, lat_resolution 
     data_reclassed = np.array(lat_list)
     
     return data_reclassed
+
+
+
+def checkCO(daily_data_dict, lat, lon):
+    """
+    Check CO concentration (in ppb) for given lat/lon combination
+
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+        Contains at least: lat_min, lat_max, lon_min, lon_max and CO_ppb
+    lat : float
+        latitude.
+    lon : float
+        longitude.
+
+    Returns
+    -------
+    CO_concentration : float
+        Carbon Monoxide concentration (in ppb) as measured by TROPOMI on specified day
+
+    """
+    
+    # Defining boundaries
+    assert daily_data_dict['lat_min'] < lat < daily_data_dict['lat_max'] \
+        and daily_data_dict['lon_min'] < lon < daily_data_dict['lon_max'], \
+            'given lat/lon combination is out of reach!'
+    
+    lonrange = np.linspace(daily_data_dict['lon_min'], daily_data_dict['lon_max'], len(daily_data_dict['CO_ppb'][0]))
+    latrange = np.linspace(daily_data_dict['lat_min'], daily_data_dict['lat_max'], len(daily_data_dict['CO_ppb']))
+    
+    # Get indices of lon and lat
+    ilon = (np.abs(lonrange - lon)).argmin()
+    ilat = (np.abs(latrange - lat)).argmin()
+    CO_concentration = daily_data_dict['CO_ppb'][ilat, ilon]
+    
+    return CO_concentration
+
+    

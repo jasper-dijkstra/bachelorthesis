@@ -54,7 +54,7 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Apply operations:
-use_wind_rotations = True   # rotate plumes in wind direction to improve results
+use_wind_rotations = False   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
 compare_with_GFED = True    # compare TROPOMI data with modelled wildfires from GFED
     
@@ -62,7 +62,7 @@ compare_with_GFED = True    # compare TROPOMI data with modelled wildfires from 
 gen_txt_plume_coord = False  # txt file with plume coordinates
 gen_fig_xCO = False          # figure with CO concentration (ppb)
 gen_fig_plume = False        # masked plume figure
-gen_fig_wind_vector = True  # wind vector field figure
+gen_fig_wind_vector = False  # wind vector field figure
 
 # Setting other parameters
 max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
@@ -125,7 +125,7 @@ for day in daily_data:
     # 3: Check if all plumes overlap with a buffer around modelled GFED data
     if compare_with_GFED == True:
         gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
-        gfed_buffered = window.DrawBuffer(gfed_array, buffersize = 10) # Draw circular buffers around GFED plumes
+        gfed_buffered = window.DrawBuffer(gfed_array, buffersize = 4) # Draw circular buffers around GFED plumes
         outarr = daily_data[day]['plume_mask'] * gfed_buffered # Only allow plumes within buffersize
         daily_data[day]['plume_mask'] = outarr
         daily_data[day]['GFED_emissions'] = gfed_array
@@ -156,7 +156,7 @@ for day in daily_data:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)
     if gen_fig_wind_vector == True:
-        assert use_wind_rotations == True, 'Wind rotations have to be applied before wind vectorfield can be created!'
+        assert use_wind_rotations == True, 'use_wind_rotations has to be True before wind vectorfield can be created!'
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateWindVector(daily_data[day], fig_dir, labeltag = 'wind speed (m/s)', title='test')
 

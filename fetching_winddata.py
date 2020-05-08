@@ -53,7 +53,10 @@ def DownloadERA5(daily_data_dict, pressure_level=850):
     curr_directory = os.getcwd()
     out_dir = os.path.join(curr_directory, r'store_meteo_data')
     ut.DefineAndCreateDirectory(out_dir)
-    filename = 'ERA5_{}{}{}-{}{}{}.nc'.format(min(months), min(days), min(years), max(months), max(days), max(years))
+    filename = 'ERA5_{}{}{}-{}{}{}_{}.nc'.format(min(months), \
+                                              min(days), min(years), max(months), \
+                                                  max(days), max(years), \
+                                                      pressure_level)
     
     if os.path.isfile(os.path.join(out_dir, filename)) == True:
         print('ERA5 meteodata already exists for the period: {}/{}/{}-{}/{}/{}!'.format(min(months), min(days), min(years), max(months), max(days), max(years)))
