@@ -133,7 +133,7 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     year = time_dict['year']
         
     co_ppb = 'xco_ppb'      # Set target for map creation
-    uncertainty = 'xco_ppb_unc'
+    uncertainty = 'qa' #'xco_ppb_unc'
     
     # Target Resolution
     nlon_t=target_lon
@@ -257,10 +257,6 @@ def ReadGFED(daily_data_dict):
     
     gfed = list()
     for iobs in range(len(latrange)):
-        
-        #Find observation coordinates
-        #lon_obs = lonrange
-        #lat_obs = latrange[iobs]
                 
         #Calculate target pixel for the observation iobs
         ilon = ((lonrange - lon_hdf[0]) / (lon_hdf[1] - lon_hdf[0])).astype('int')

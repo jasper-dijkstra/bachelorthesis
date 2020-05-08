@@ -130,7 +130,7 @@ def CreateTargetLatLonGrid(daily_data_dict, figtype):
 
 
 
-def CreateMaskMap(daily_data_dict, figtype, figue_directory, title=None, \
+def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
                   labels=["no plume", "plume"], colors=['white', 'red']):
     """
     
@@ -144,7 +144,7 @@ def CreateMaskMap(daily_data_dict, figtype, figue_directory, title=None, \
         and np.array with values to plot and count_t.
     figtype : string
         Name as in daily_data_dict of the np.array containing values to plot.
-    figue_directory : string
+    figure_directory : string
         Directory where figures will be stored.
     labels : list with strings, optional
         Labels for each tick on colorbar. The default is ["no plume", "plume"].
@@ -201,20 +201,20 @@ def CreateMaskMap(daily_data_dict, figtype, figue_directory, title=None, \
 
     # Title in figure or not
     if title != None:
-        plt.title(title)
+        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
     else:
-        plt.title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day))
+        ax.set_title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day), horizontalalignment='center', verticalalignment='top')
     
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
     curr_time = ut.GetCurrentTime()
-    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
+    fig.savefig(figure_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
             curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
     plt.close()
     
     
-def CreateColorMap(daily_data_dict, figtype, figue_directory, masking=True, \
+def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
                    labeltag='values', title=None):
     """
     
@@ -228,7 +228,7 @@ def CreateColorMap(daily_data_dict, figtype, figue_directory, masking=True, \
         and np.array with values to plot and count_t.
     figtype : string
         Name as in daily_data_dict of the np.array containing values to plot.
-    figue_directory : string
+    figure_directory : string
         Directory where figures will be stored.
     masking : bool, optional
         DESCRIPTION. The default is True.
@@ -276,15 +276,108 @@ def CreateColorMap(daily_data_dict, figtype, figue_directory, masking=True, \
     
     # Title in figure or not
     if title != None:
-        plt.title(title)
+        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
     else:
-        plt.title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day))
+        ax.set_title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day), horizontalalignment='center', verticalalignment='top')
 
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
     curr_time = ut.GetCurrentTime()
-    fig.savefig(figue_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
+    fig.savefig(figure_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
             curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
     plt.close()  
 
+
+def scatterplot(x, y, figure_directory, title=None, popup=False):
+    plt.xlabel('buffersize')
+    plt.ylabel('amount of plume grid cells')
+    
+    if title != None:
+        plt.title(title)
+    
+    plt.scatter(x, y)
+    curr_time = ut.GetCurrentTime()
+    plt.savefig(figure_directory + r'scatter_{}{}{}{}{}{}.png'.format(curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    plt.close()
+    
+    return
+
+
+
+
+def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=None, vector_only=False, skip=30):
+    """
+    
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+        Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
+        u_wind and v_wind.
+    figure_directory : string
+        Directory where figures will be stored.
+    labeltag : string, optional
+        Tag for the colorbar of the plot. The default is 'm/s'.
+    title : string, optional
+        Title to be given to the plot. The default is None.
+    vector_only : bool, optional
+        Only draw wind vectors if True. If False also colored wind speed is drawn.
+        The default is False.
+    skip : int, optional
+        Every <skip> arrow is drawn in figure. The default is 30.
+
+    Returns
+    -------
+    Map saved as png in figure_directory.
+
+    """
+    
+    # Retrieving month, day and year
+    day = daily_data_dict['day']
+    month = daily_data_dict['month']
+    year = daily_data_dict['year']
+    
+    # Define U and V wind 
+    U = daily_data_dict['u_wind']
+    V = daily_data_dict['v_wind']
+    
+    windspeed = (U ** 2 + V ** 2) ** 0.5
+    #direction = 180 + (180/np.pi)*np.arctan2(V,U)
+    
+    # Create a longitude and latitude np.meshgrid in target resolution
+    lon, lat = CreateTargetLatLonGrid(daily_data_dict, 'u_wind')
+    
+    # plot with cartopy
+    fig = plt.figure(figsize=(10,6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    
+    # Add some cartopy features to the map
+    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
+
+    # Draw vectors
+    plt.quiver(lon[::skip, ::skip], lat[::skip, ::skip], U[::skip, ::skip], V[::skip, ::skip], transform=ccrs.PlateCarree(), pivot = 'mid')
+
+    # Color wind speed as background as well
+    if not vector_only:
+        cs = plt.pcolormesh(lon, lat, windspeed, cmap='rainbow', transform=ccrs.PlateCarree())
+        cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
+        cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
+        cb.set_label(labeltag)
+    
+    # Title in figure or not
+    if title != None:
+        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
+    else:
+        ax.set_title('Map of wind speed and direction, at: {}/{}/{}'.format(year, month, day), horizontalalignment='center', verticalalignment='top')
+    
+    plt.ioff() # Preventing figures from appearing as pop-up
+    
+    # Saving figure
+    curr_time = ut.GetCurrentTime()
+    fig.savefig(figure_directory + r'fig_windvector_{}_{}_{}___{}{}{}{}{}{}.png'.format(month, day, year, \
+            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    plt.close() 
+
+    return

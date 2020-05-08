@@ -59,9 +59,10 @@ apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
 compare_with_GFED = True    # compare TROPOMI data with modelled wildfires from GFED
     
 # Outputs to be generated:
-gen_txt_plume_coord = False # txt file with plume coordinates
-gen_fig_xCO = True          # figure with CO concentration (ppb)
-gen_fig_plume = True        # masked plume figure
+gen_txt_plume_coord = False  # txt file with plume coordinates
+gen_fig_xCO = False          # figure with CO concentration (ppb)
+gen_fig_plume = False        # masked plume figure
+gen_fig_wind_vector = True  # wind vector field figure
 
 # Setting other parameters
 max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
@@ -82,11 +83,11 @@ files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
 start = datetime.now()
 
 # Reading daily csv files for specified area and day as np.arrays
+#daily_data = defaultdict()
 daily_data = {}
 for i, file in enumerate(files):    
         day_data = inpt.reading_csv_as_nparray(file, boundaries, target_lon, target_lat, max_unc_ppb)
-        upd = {i : day_data}
-        daily_data.update(upd)
+        daily_data[i] = day_data
         if apply_land_sea_mask == True:
             daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
             daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
@@ -114,17 +115,21 @@ for day in daily_data:
     outarr = window.MovingWindow(arr, window=(100,100), step=20, treshold=0.95) # Apply moving Window operation
     neighbors = window.CheckSurroundings(outarr) # Identify neighbors of each grid cell
     outarr[neighbors < 1] = 0 # Removing nuisances by making sure there is at least one neighbour
-    daily_data[day].update({'plume_mask':outarr, 'neighbors':neighbors})
-    
+    daily_data[day]['plume_mask'] = outarr
+    daily_data[day]['neighbors'] = neighbors
+
+ 
     # 2: Rotate in the wind, to check if (center of) plumes overlap multiple days
         # Wildfires tend to occur less than one day!
-    
+ 
     # 3: Check if all plumes overlap with a buffer around modelled GFED data
     if compare_with_GFED == True:
         gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
         gfed_buffered = window.DrawBuffer(gfed_array, buffersize = 10) # Draw circular buffers around GFED plumes
         outarr = daily_data[day]['plume_mask'] * gfed_buffered # Only allow plumes within buffersize
-        daily_data[day].update({'plume_mask':outarr, 'GFED_emissions':gfed_array, 'GFED_buffers':gfed_buffered})
+        daily_data[day]['plume_mask'] = outarr
+        daily_data[day]['GFED_emissions'] = gfed_array
+        daily_data[day]['GFED_buffers'] = gfed_buffered
 
 # Find center of plume (also, write this txt instead of every gridcell)
 # Draw rectangle around it, size depending on size plume (find ideal size)
@@ -150,6 +155,10 @@ for day in daily_data:
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)
+    if gen_fig_wind_vector == True:
+        assert use_wind_rotations == True, 'Wind rotations have to be applied before wind vectorfield can be created!'
+        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+        output.CreateWindVector(daily_data[day], fig_dir, labeltag = 'wind speed (m/s)', title='test')
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))

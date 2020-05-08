@@ -143,3 +143,67 @@ def ModifiedJulianDatetoUTC(mjd):
     else:
         result={"year":gmt[:,0],"month":gmt[:,1], "day":gmt[:,2], "hour":gmt[:,3], "minute":gmt[:,4], "second":gmt[:,5], "millisecond":np.round(np.array(t%1)*1000.0).astype(np.int), "fractional_year":fractional_year, "day_of_year":day_of_year}
     return result
+
+
+
+def ReclassArray(daily_data_dict, arraytype, lon_resolution = 7, lat_resolution = 7):
+    """
+    
+
+    Parameters
+    ----------
+    daily_data_dict : dictionary
+        daily_data[<day>], contains data about TROPOMI measurement per day.
+        Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
+        and np.ndarray to be reclassified.
+    arraytype : string
+        key of ndarray in daily_data_dict containing values to be reclassified.
+    lon_resolution : integer, optional
+        grid cell target resolution (km) in longitudinal direction. The default is 7.
+    lat_resolution : integer, optional
+        grid cell target resolution (km) in longitudinal direction. The default is 7.
+        
+    NOTE! lon- and lat_resolution might be distorted the further away from the equator.
+    Therefore lon- and lat_resolution in km might not be exactly the input
+    
+    Returns
+    -------
+    data_reclassed : ndarray
+        ndarray with resampled values of arraytype.
+
+    """
+    # Defining data_array
+    data = daily_data_dict[arraytype]
+    
+    # Defining boundaries
+    lat_min = daily_data_dict['lat_min']
+    lat_max = daily_data_dict['lat_max']
+    lon_min = daily_data_dict['lon_min']
+    lon_max = daily_data_dict['lon_max']
+    
+    # Setting the original resolution
+    lon = np.linspace(lon_min, lon_max, len(data[0]))
+    lat = np.linspace(lat_min, lat_max, len(data))
+    
+    # Setting target resolution
+    nlon_t = int(abs((lon_max-lon_min)/(lon_resolution/110)))
+    nlat_t = int(abs((lat_max-lat_min)/(lat_resolution/110)))
+    
+    # Generate target coordinate meshgrid
+    lon_t = np.linspace(lon_min, lon_max, nlon_t)
+    lat_t = np.linspace(lat_min, lat_max, nlat_t)
+    #lon, lat = np.meshgrid(lon_t, lat_t)
+    
+    lat_list = list()
+    for iobs in range(len(lat_t)):
+        
+        #Calculate target pixel for the observation iobs
+        ilon = ((lon_t - lon[0]) / (lon[1] - lon[0])).astype('int')
+        ilat = ((lat_t[iobs] - lat[0])/(lat[1]-lat[0])).astype('int')
+        
+        lat_row = data[ilat,ilon]
+        lat_list.append(lat_row)
+     
+    data_reclassed = np.array(lat_list)
+    
+    return data_reclassed
