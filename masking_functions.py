@@ -136,3 +136,4 @@ def identify_enhancements_3(arr, st_devs=1):
     arr[arr > 0] = 1 # Change all enhancements to 1 (masking them)
     
     return arr
+

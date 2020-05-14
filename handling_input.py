@@ -96,7 +96,7 @@ def reading_csv_as_df(csv_file):
     return COdata
 
 
-def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
+def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc):
     """
     
     Parameters
@@ -124,16 +124,17 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     
     COdata = reading_csv_as_df(csvfile) # Reading Australia csv, as pd.dataframe
     
-    # Retrieving day, month and year of dataset
+    # Non-spatially explicit data to be retrieved from dataset
     day = COdata.at[0, 'day']
     month = COdata.at[0, 'month']
     # Create dict form Julian Date to UTC
     time_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
-    #hour = time_dict['hour'] # This can be an enhancement for meteodata!
     year = time_dict['year']
         
-    co_ppb = 'xco_ppb'      # Set target for map creation
-    uncertainty = 'qa' #'xco_ppb_unc'
+    # Spatially explicit data to be retrieved from dataset
+    co_ppb = 'xco_ppb'      # 2D array on CO concentration
+    uncertainty = 'qa'      # 2D array on uncertainty of data'xco_ppb_unc'
+    time = 'time'           # 2D array on hour of data capture
     
     # Target Resolution
     nlon_t=target_lon
@@ -143,6 +144,7 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     field_t = np.zeros((nlat_t,nlon_t))
     count_t = np.zeros((nlat_t,nlon_t))
     unc_t = np.zeros((nlat_t,nlon_t))
+    timestamp = np.zeros((nlat_t,nlon_t))
     
     delta_lon = int(lon_max - lon_min) # Calculate Target Longitudal Range
     delta_lat = int(lat_max - lat_min) # Calculate Target Latitudal Range
@@ -158,13 +160,19 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
         ilon = np.int((lon_obs - lon_min)* nlon_t / delta_lon)
         ilat = np.int((lat_obs - lat_min)* nlat_t / delta_lat)
         
+        # Append observations to correct indices
         if COdata.at[iobs, co_ppb] > 2.5e3: continue
         field_t[ilat,ilon] += COdata.at[iobs, co_ppb]
         unc_t[ilat,ilon] += COdata.at[iobs, uncertainty]
         count_t[ilat,ilon] += 1
+        timestamp[ilat,ilon] += COdata.at[iobs, time]
     
     idx = (count_t > 0)
     field_t[idx] = field_t[idx]/count_t[idx]
+    unc_t[idx] = unc_t[idx]/count_t[idx]
+    
+    # Filter measurements where multiple timestamps have been put in one cell
+    timestamp[count_t > 1] = 0
     
     # Removing data with a too high uncertainty
     field_t[unc_t > max_unc] = 0
@@ -173,7 +181,7 @@ def reading_csv_as_nparray(csvfile, bbox, target_lon, target_lat, max_unc):
     returndict = {'day':day, 'month':month, 'year':year, 'uncertainty':unc_t,\
                   'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
                       'lat_max':lat_max, 'target_lon':nlon_t, 'target_lat':nlat_t,\
-                          'count_t':count_t, 'CO_ppb':field_t}#, 'hour': hour}
+                          'count_t':count_t, 'CO_ppb':field_t, 'timestamp': timestamp.astype(int)}
     return returndict
 
 

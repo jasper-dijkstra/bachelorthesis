@@ -10,8 +10,7 @@ This script contains functions to:
     3. Get current time (year, month, day, hour, minute, second)
     4. Convert UTC to modified Julian date 2010 ((C) Bram Maasakkers)
     5. Convert modified Julian date 2010 to UTC ((C) Bram Maasakkers)
-    6. Reclassify np.array in daily_data_dict to specified resolution
-    7. Check CO concentration (in ppb) for given lat/lon combination
+    6. Check CO concentration (in ppb) for given lat/lon combination
 
 """
 
@@ -19,6 +18,10 @@ import os
 from datetime import datetime
 import calendar
 import numpy as np
+import numpy.ma as ma
+
+import raster_tools as raster
+import masking_functions as maf
 
 
 def DefineAndCreateDirectory(targetDirectory):
@@ -131,6 +134,8 @@ def ModifiedJulianDatetoUTC(mjd):
     global t2010
     
     t2010 = calendar.timegm((2010, 1, 1, 0, 0, 0)) # seconds in epoch 1970 corresponding to 1 Jan 2010
+    
+    # Vectorize inputs
     if isinstance(mjd, (np.ndarray,list)): # if input is a vector
         is_scalar = False
         if isinstance(mjd,list):
@@ -138,6 +143,7 @@ def ModifiedJulianDatetoUTC(mjd):
     else: # input is a scalar
         is_scalar = True
         mjd = np.array([mjd])  # convert to array
+        
     t = mjd + t2010 # compute seconds since epoch 1970
     gmt = np.zeros((len(mjd),9), dtype=np.int) # initialise field for intermediate result
     fractional_year = np.zeros(len(mjd), dtype=np.double)
@@ -154,68 +160,65 @@ def ModifiedJulianDatetoUTC(mjd):
     return result
 
 
-
-def ReclassArray(daily_data_dict, arraytype, lon_resolution = 7, lat_resolution = 7):
+def Get2DTime(arr, key):
     """
-    Reclassify np.array in daily_data_dict to specified resolution
+    
 
     Parameters
     ----------
-    daily_data_dict : dictionary
-        daily_data[<day>], contains data about TROPOMI measurement per day.
-        Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
-        and np.ndarray to be reclassified.
-    arraytype : np.array
-        key of np.ndarray in daily_data_dict containing values to be reclassified.
-    lon_resolution : integer, optional
-        grid cell target resolution (km) in longitudinal direction. The default is 7.
-    lat_resolution : integer, optional
-        grid cell target resolution (km) in longitudinal direction. The default is 7.
-        
-    NOTE! lon- and lat_resolution might be distorted the further away from the equator.
-    Therefore lon- and lat_resolution in km might not be exactly the input
-    
+    arr : np.ndarray
+        2D array with JulianDate values.
+    key : string
+        values that have to be retrieved from JulianDate.
+        Choose from: 'year', 'month', 'day', 'hour', 'minute', 'second', 'milisecond', 'day_of_year', 'fractional_year'
+
     Returns
     -------
-    data_reclassed : ndarray
-        ndarray with resampled values of arraytype.
+    arr : np.ndarray
+        2D array the size of arr, with values of desired key.
 
     """
-    # Defining data_array
-    data = daily_data_dict[arraytype]
     
-    # Defining boundaries
-    lat_min = daily_data_dict['lat_min']
-    lat_max = daily_data_dict['lat_max']
-    lon_min = daily_data_dict['lon_min']
-    lon_max = daily_data_dict['lon_max']
+    keyslist = ['year', 'month', 'day', 'hour', 'minute', 'second', 'milisecond', 'day_of_year', 'fractional_year']
+    assert key in keyslist, 'key {key} is not recognised!'
     
-    # Setting the original resolution
-    lon = np.linspace(lon_min, lon_max, len(data[0]))
-    lat = np.linspace(lat_min, lat_max, len(data))
+    # Split 
+    flattened_arr = arr.flatten()
     
-    # Setting target resolution
-    nlon_t = int(abs((lon_max-lon_min)/(lon_resolution/110)))
-    nlat_t = int(abs((lat_max-lat_min)/(lat_resolution/110)))
+    # Identify indices with zero (no data) and nonzero values
+    nonzero_indices = np.where(flattened_arr != 0)
+    zero_indices = np.where(flattened_arr == 0)
     
-    # Generate target coordinate meshgrid
-    lon_t = np.linspace(lon_min, lon_max, nlon_t)
-    lat_t = np.linspace(lat_min, lat_max, nlat_t)
-    #lon, lat = np.meshgrid(lon_t, lat_t)
+    # Remove the zero values
+    timestamps_arr = np.delete(flattened_arr, zero_indices)
     
-    lat_list = list()
-    for iobs in range(len(lat_t)):
-        
-        #Calculate target pixel for the observation iobs
-        ilon = ((lon_t - lon[0]) / (lon[1] - lon[0])).astype('int')
-        ilat = ((lat_t[iobs] - lat[0])/(lat[1]-lat[0])).astype('int')
-        
-        lat_row = data[ilat,ilon]
-        lat_list.append(lat_row)
-     
-    data_reclassed = np.array(lat_list)
+    # Compute <key> 
+    timestamps_arr = ModifiedJulianDatetoUTC(timestamps_arr)[key]
     
-    return data_reclassed
+    # Create new array to return
+    out_arr = np.zeros(flattened_arr.shape)
+    for i in range(len(nonzero_indices[0])):
+        index = nonzero_indices[0][i]
+        out_arr[index] = timestamps_arr[i]
+
+    # Back to 2D array
+    out_arr = np.reshape(out_arr, arr.shape).astype(np.int)
+    
+    # Apply smoothing filter
+    out_arr = raster.MovingWindow(out_arr, raster.SetMostOccuring, window=(10,10), step=5)
+    
+    # Mask original 0 values
+    out_arr[arr == 0]
+    #out_arr = ma.array(out_arr, mask=mask)
+    
+    print(f'min val = {np.min(out_arr)}')
+    print(f'max val = {np.max(out_arr)}')
+    return out_arr
+
+
+
+
+
 
 
 
