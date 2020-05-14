@@ -81,7 +81,7 @@ def filter_csv_by_bbox(csvfile, bbox):
 # IMPORTING AND EXPORTING CSV FILES
 #----------------------------------
 
-def reading_csv_as_df(csv_file):
+def CSVtoDf(csv_file):
     """
     --------
     Parameters:
@@ -93,10 +93,11 @@ def reading_csv_as_df(csv_file):
     
     CO_header = ['lat0', 'lat1', 'lat2', 'lat3', 'lat', 'lon0', 'lon1', 'lon2', 'lon3', 'lon', 'xco', 'xco_unc', 'xco_ppb', 'xco_ppb_unc', 'qa', 'weekday', 'day', 'month', 'aerosol_opthick', 'aerosol_layer', 'orbitnr', 'time']
     COdata = pd.read_csv(csv_file, header=None, names=CO_header)
+    
     return COdata
 
 
-def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc):
+def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
     """
     
     Parameters
@@ -122,68 +123,67 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc):
     lon_min = bbox[2]
     lon_max = bbox[3]
     
-    COdata = reading_csv_as_df(csvfile) # Reading Australia csv, as pd.dataframe
     
-    # Non-spatially explicit data to be retrieved from dataset
-    day = COdata.at[0, 'day']
-    month = COdata.at[0, 'month']
-    # Create dict form Julian Date to UTC
-    time_dict = ut.ModifiedJulianDatetoUTC(int(COdata.at[0, 'time']))
-    year = time_dict['year']
-        
-    # Spatially explicit data to be retrieved from dataset
-    co_ppb = 'xco_ppb'      # 2D array on CO concentration
-    uncertainty = 'qa'      # 2D array on uncertainty of data'xco_ppb_unc'
-    time = 'time'           # 2D array on hour of data capture
+    COdata = CSVtoDf(csvfile) # Reading csv as pd.dataframe
+    COdata = COdata.to_numpy() # Transforming pd.dataframe to np.array
+
+    # Convert TROPOMI timestamp to UTC date, time floats
+    time = ut.ModifiedJulianDatetoUTC(COdata[:,21])
     
-    # Target Resolution
-    nlon_t=target_lon
-    nlat_t=target_lat
+    # Get year, month, day from time dictionary (not spatially explicit)
+    year = time['hour'][0]
+    month = time['month'][0]
+    day = time['day'][0]
+    
+    # Spatially explicit data from TROPOMI
+    lat = COdata[:,4]
+    lon = COdata[:,9]
+    xco_ppb_1d = COdata[:,12]
+    qa_1d = COdata[:,14]
+    hour_1d = time['hour']
+    
     
     # Initiate arrays that save the observation totals for every pixel
-    field_t = np.zeros((nlat_t,nlon_t))
-    count_t = np.zeros((nlat_t,nlon_t))
-    unc_t = np.zeros((nlat_t,nlon_t))
-    timestamp = np.zeros((nlat_t,nlon_t))
+    xco_ppb = np.zeros((target_lat, target_lon))
+    qa = np.zeros((target_lat, target_lon))
+    hour = np.zeros((target_lat, target_lon))
+    count_t = np.zeros((target_lat, target_lon))
     
-    delta_lon = int(lon_max - lon_min) # Calculate Target Longitudal Range
-    delta_lat = int(lat_max - lat_min) # Calculate Target Latitudal Range
-    
+
     # reduce data resolution to target resolution
-    for iobs in range(len(COdata)):
+    for iobs in range(len(xco_ppb_1d)):
         
-        #Find observation coordinates
-        lon_obs = COdata.at[iobs, 'lon']
-        lat_obs = COdata.at[iobs, 'lat']
-                
-        #Calculate target pixel for the observation iobs
-        ilon = np.int((lon_obs - lon_min)* nlon_t / delta_lon)
-        ilat = np.int((lat_obs - lat_min)* nlat_t / delta_lat)
+        #Calculate target pixel for the observation iobs    
+        ilon = np.int((lon[iobs] - lon_min)* target_lon / (lon_max - lon_min))
+        ilat = np.int((lat[iobs] - lat_min)* target_lat / (lat_max - lat_min))
         
-        # Append observations to correct indices
-        if COdata.at[iobs, co_ppb] > 2.5e3: continue
-        field_t[ilat,ilon] += COdata.at[iobs, co_ppb]
-        unc_t[ilat,ilon] += COdata.at[iobs, uncertainty]
+        # Append iobs to correct ilat, ilon (indices) in 2d array
+        xco_ppb[ilat,ilon] += xco_ppb_1d[iobs]
+        qa[ilat,ilon] += qa_1d[iobs]
+        hour[ilat, ilon] += hour_1d[iobs]
         count_t[ilat,ilon] += 1
-        timestamp[ilat,ilon] += COdata.at[iobs, time]
-    
-    idx = (count_t > 0)
-    field_t[idx] = field_t[idx]/count_t[idx]
-    unc_t[idx] = unc_t[idx]/count_t[idx]
-    
-    # Filter measurements where multiple timestamps have been put in one cell
-    timestamp[count_t > 1] = 0
     
     # Removing data with a too high uncertainty
-    field_t[unc_t > max_unc] = 0
-    count_t[unc_t > max_unc] = 0
+    #xco_ppb[qa < max_unc] = 0
+    #hour[qa < max_unc] = 0
+    #count_t[qa < max_unc] = 0
     
-    returndict = {'day':day, 'month':month, 'year':year, 'uncertainty':unc_t,\
-                  'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
-                      'lat_max':lat_max, 'target_lon':nlon_t, 'target_lat':nlat_t,\
-                          'count_t':count_t, 'CO_ppb':field_t, 'timestamp': timestamp.astype(int)}
-    return returndict
+    # Apply correction for cells that overlap
+    idx = (count_t > 0)
+    xco_ppb[idx] = xco_ppb[idx]/count_t[idx]
+    #qa[idx] = qa[idx]/count_t[idx]
+    hour[idx] = hour[idx]/count_t[idx]
+    
+    # Change all 'no data' values (count_t == 0) to np.nan
+    hour[count_t == 0] = np.nan
 
+   
+    returndict = {'day':day, 'month':month, 'year':year, \
+                  'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
+                      'lat_max':lat_max, 'target_lon':target_lon, 'target_lat':target_lat,\
+                          'count_t':count_t, 'CO_ppb':xco_ppb, 'hour': hour}
+
+    return returndict
 
 
 def export_as_csv(csv_out_path, data):
