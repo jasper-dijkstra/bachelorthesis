@@ -35,7 +35,7 @@ import handling_input as inpt
 import handling_output as output
 import masking_functions as mask
 import raster_tools as raster
-#import fetching_winddata as ERA5
+import fetching_winddata as wind
 import utilities as ut
 
 
@@ -54,14 +54,14 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Apply operations:
-use_wind_rotations = False   # rotate plumes in wind direction to improve results
+use_wind_rotations = True   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
 compare_with_GFED = True    # compare TROPOMI data with modelled wildfires from GFED
     
 # Outputs to be generated:
-gen_txt_plume_coord = True  # txt file with plume coordinates
-gen_fig_xCO = True          # figure with CO concentration (ppb)
-gen_fig_plume = True        # masked plume figure
+gen_txt_plume_coord = False  # txt file with plume coordinates
+gen_fig_xCO = False          # figure with CO concentration (ppb)
+gen_fig_plume = False        # masked plume figure
 gen_fig_wind_vector = False  # wind vector field figure
 
 # Setting other parameters
@@ -86,22 +86,21 @@ start = datetime.now()
 #daily_data = defaultdict()
 daily_data = {}
 for i, file in enumerate(files):    
-        daily_data[i] = inpt.CSVtoArray(file, boundaries, target_lon, target_lat, max_unc_ppb)
+    daily_data[i] = inpt.CSVtoArray(file, boundaries, target_lon, target_lat, max_unc_ppb)
     
-        # Get spatially explicit hourly data from TROPOMI timestamp
-        daily_data[i]['hour'] = ut.Get2DTime(daily_data[i]['timestamp'], 'hour').astype(int)
         
-        if apply_land_sea_mask == True:
-            daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
-            daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
+    if apply_land_sea_mask == True:
+        daily_data[i]['CO_ppb'] = mask.land_sea_mask(daily_data[i]['CO_ppb'], boundaries)
+        daily_data[i]['count_t'] = mask.land_sea_mask(daily_data[i]['count_t'], boundaries)
 
             
             
-            
-# collect meteodata via ECMWF CDS API:
-#if use_wind_rotations == True:
-#    downloaded_nc_path = ERA5.DownloadERA5(daily_data, pressure_level=850)
-#    daily_data = ERA5.ProcessMeteo(daily_data, downloaded_nc_path)
+for day in daily_data:          
+    # collect meteodata via ECMWF CDS API:
+    if use_wind_rotations == True:
+        u_wind, v_wind = wind.FetchWindData(daily_data[day], pressure=1000, timerange=5)
+        daily_data[day]['u_wind'] = u_wind
+        daily_data[day]['v_wind'] = v_wind
 
 print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 
@@ -169,7 +168,6 @@ for day in daily_data:
     if gen_fig_xCO == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateColorMap(daily_data[day], 'CO_ppb', fig_dir, labeltag = 'ppb')
-        
     if gen_fig_plume == True:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)

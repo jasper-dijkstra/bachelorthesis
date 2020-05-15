@@ -205,14 +205,14 @@ def Get2DTime(arr, key):
     out_arr = np.reshape(out_arr, arr.shape).astype(np.int)
     
     # Apply smoothing filter
-    out_arr = raster.MovingWindow(out_arr, raster.SetMostOccuring, window=(10,10), step=5)
+    #out_arr = raster.MovingWindow(out_arr, raster.SetMostOccuring, window=(10,10), step=5)
     
     # Mask original 0 values
-    out_arr[arr == 0]
+    out_arr[arr == 0] = 0
     #out_arr = ma.array(out_arr, mask=mask)
     
-    print(f'min val = {np.min(out_arr)}')
-    print(f'max val = {np.max(out_arr)}')
+    #print(f'min val = {np.min(out_arr)}')
+    #print(f'max val = {np.max(out_arr)}')
     return out_arr
 
 

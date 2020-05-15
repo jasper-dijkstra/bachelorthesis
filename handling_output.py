@@ -306,7 +306,7 @@ def scatterplot(x, y, figure_directory, title=None, popup=False):
 
 
 
-def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=None, vector_only=False, skip=30):
+def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=None, vector_only=False, skip=30, background='magnitude', masking = False):
     """
     
     Parameters
@@ -357,11 +357,21 @@ def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=No
     ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
 
     # Draw vectors
-    plt.quiver(lon[::skip, ::skip], lat[::skip, ::skip], U[::skip, ::skip], V[::skip, ::skip], transform=ccrs.PlateCarree(), pivot = 'mid')
-
+    cs = plt.quiver(lon[::skip, ::skip], lat[::skip, ::skip], U[::skip, ::skip], V[::skip, ::skip], transform=ccrs.PlateCarree(), pivot = 'mid', zorder=2)
+    
     # Color wind speed as background as well
     if not vector_only:
-        cs = plt.pcolormesh(lon, lat, windspeed, cmap='rainbow', transform=ccrs.PlateCarree())
+        if background == 'magnitude':
+            cs = plt.pcolormesh(lon, lat, windspeed, cmap='rainbow', transform=ccrs.PlateCarree(), zorder = 1)
+        else:
+            if masking == True:
+                # Masking all zero values
+                count_t = daily_data_dict['count_t']
+                mask = (count_t == 0)
+                field_mt = ma.array(daily_data_dict[background], mask=mask)
+            else:
+                field_mt = daily_data_dict[background]
+            cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree(), zorder = 1)
         cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
         cb.set_label(labeltag)

@@ -131,7 +131,7 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
     time = ut.ModifiedJulianDatetoUTC(COdata[:,21])
     
     # Get year, month, day from time dictionary (not spatially explicit)
-    year = time['hour'][0]
+    year = time['year'][0]
     month = time['month'][0]
     day = time['day'][0]
     
