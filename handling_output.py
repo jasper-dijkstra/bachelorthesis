@@ -54,7 +54,7 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     labels, nlabels = ndimage.label(plumes) # Label data
     indices = ndimage.center_of_mass(plume_mask, labels, np.arange(nlabels) + 1) # Define center of mass of labeled plumes
     max_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
-    mean_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
+    mean_xco = ndimage.measurements.mean(field_t, labels, np.arange(nlabels) + 1)
     plume_size = ndimage.labeled_comprehension(plume_mask, labels, np.arange(nlabels) + 1, np.sum, float, 0)
     
     # Generate coordinate meshgrid
@@ -71,13 +71,13 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory):
     filename = coord_directory + \
         'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
     
-    headerstring = """#----------------------------------------
+    headerstring = f"""#----------------------------------------
 #----------------------------------------
-This file was automatically generated at: {}/{}/{} {}:{}
+This file was automatically generated at: {curr_time['year']}/{curr_time['month']}/{curr_time['day']} {curr_time['hour']}:{curr_time['minute']}
 
-This file contains a list with information on Carbon Monoxide plumes at {}/{}/{}, between:
-longitudes: [{}, {}] 
-latitudes: [{}, {}] 
+This file contains a list with information on Carbon Monoxide plumes at {month}/{day}/{year}, between:
+longitudes: [{lon_min}, {lon_max}] 
+latitudes: [{lat_min}, {lat_max}] 
 
 column descriptions:
 - latitude:     Latitude of center of plume
@@ -86,14 +86,12 @@ column descriptions:
 - CO_max:       Highest Carbon Monoxide concentration measured in plume (ppb)
 - CO_average:   Average Carbon Monoxide concentration measured in plume (ppb)
 
-Total amount of plumes identified: {}         
+Total amount of plumes identified: {total}         
              
 #----------------------------------------
 #----------------------------------------
 latitude, longitude, grid_cells, CO_max, CO_average,
-""".format(curr_time['year'], curr_time['month'], curr_time['day'], \
-    curr_time['hour'], curr_time['minute'], month, day, year, \
-        lon_min, lon_max, lat_min, lat_max, total)
+"""
     
     f = open(filename, 'w+')
     f.write(headerstring)
@@ -103,7 +101,7 @@ latitude, longitude, grid_cells, CO_max, CO_average,
         y = int(indices[i][0])
         x_co_max = int(max_xco[i][1])
         y_co_max = int(max_xco[i][0])
-        f.write("{}, {}, {}, {}, {},\n".format(lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
+        f.write("{}; {}; {}; {}; {};\n".format(lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
     f.close()
     
     return
@@ -129,6 +127,31 @@ def CreateTargetLatLonGrid(daily_data_dict, figtype):
     return lon, lat
 
 
+def Masking(masking, daily_data_dict, figtype):
+    if masking:
+        count_t = daily_data_dict['count_t']
+        mask = (count_t == 0) # Masking all zero values in count_t array
+        field_mt = ma.array(daily_data_dict[figtype], mask=mask) # Apply this mask to figtype as well
+    else:
+        field_mt = daily_data_dict[figtype]
+    
+    return field_mt
+
+
+def Title(ax, title, figtype, year, month, day):
+    if title != None:
+        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
+    else:
+        ax.set_title(f'Map of {figtype}, at: {year}/{month}/{day}', horizontalalignment='center', verticalalignment='top')
+    
+    return ax
+
+
+def ExportFig(fig, figure_directory, figtype, month, day, year):
+    curr_time = ut.GetCurrentTime()
+    fig.savefig(figure_directory + rf"fig_{figtype}_{month}_{day}_{year}___{curr_time['year']}{curr_time['month']}{curr_time['day']}{curr_time['hour']}{curr_time['minute']}{curr_time['second']}.png", bbox_inches='tight')
+    
+    return
 
 def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
                   labels=["no plume", "plume"], colors=['white', 'red']):
@@ -199,21 +222,17 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
     cb.set_ticks([0, len(colors)-1])
     cb.set_ticklabels(labels)
 
-    # Title in figure or not
-    if title != None:
-        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
-    else:
-        ax.set_title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day), horizontalalignment='center', verticalalignment='top')
+    # Set title of figure
+    ax = Title(ax, title, figtype, year, month, day)
     
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
-    curr_time = ut.GetCurrentTime()
-    fig.savefig(figure_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
-            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    ExportFig(fig, figure_directory, figtype, month, day, year)
+
     plt.close()
-    
-    
+
+
 def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
                    labeltag='values', title=None):
     """
@@ -257,13 +276,8 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
     
-    if masking == True:
-        # Masking all zero values
-        count_t = daily_data_dict['count_t']
-        mask = (count_t == 0)
-        field_mt = ma.array(daily_data_dict[figtype], mask=mask)
-    else:
-        field_mt = daily_data_dict[figtype]
+    # Apply mask
+    field_mt = Masking(masking, daily_data_dict, figtype)
     
     # Add some cartopy features to the map
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
@@ -274,12 +288,9 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
     cb.set_label(labeltag)
     
-    # Title in figure or not
-    if title != None:
-        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
-    else:
-        ax.set_title('Map of {}, at: {}/{}/{}'.format(figtype, year, month, day), horizontalalignment='center', verticalalignment='top')
-
+    # Set title of figure
+    ax = Title(ax, title, figtype, year, month, day)
+    
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
@@ -289,24 +300,10 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     plt.close()  
 
 
-def scatterplot(x, y, figure_directory, title=None, popup=False):
-    plt.xlabel('buffersize')
-    plt.ylabel('amount of plume grid cells')
-    
-    if title != None:
-        plt.title(title)
-    
-    plt.scatter(x, y)
-    curr_time = ut.GetCurrentTime()
-    plt.savefig(figure_directory + r'scatter_{}{}{}{}{}{}.png'.format(curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
-    plt.close()
-    
-    return
 
-
-
-
-def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=None, vector_only=False, skip=30, background='magnitude', masking = False):
+def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, \
+                   labeltag='m/s', title=None, skip=30, vector_only=False):
+        
     """
     
     Parameters
@@ -361,33 +358,39 @@ def CreateWindVector(daily_data_dict, figure_directory, labeltag='m/s', title=No
     
     # Color wind speed as background as well
     if not vector_only:
-        if background == 'magnitude':
+        if figtype == 'windspeed':
             cs = plt.pcolormesh(lon, lat, windspeed, cmap='rainbow', transform=ccrs.PlateCarree(), zorder = 1)
         else:
-            if masking == True:
-                # Masking all zero values
-                count_t = daily_data_dict['count_t']
-                mask = (count_t == 0)
-                field_mt = ma.array(daily_data_dict[background], mask=mask)
-            else:
-                field_mt = daily_data_dict[background]
+            # Apply mask
+            field_mt = Masking(masking, daily_data_dict, figtype)
             cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree(), zorder = 1)
         cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
         cb.set_label(labeltag)
     
-    # Title in figure or not
-    if title != None:
-        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
-    else:
-        ax.set_title('Map of wind speed and direction, at: {}/{}/{}'.format(year, month, day), horizontalalignment='center', verticalalignment='top')
+    # Set title of figure
+    ax = Title(ax, title, figtype, year, month, day)
     
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
-    curr_time = ut.GetCurrentTime()
-    fig.savefig(figure_directory + r'fig_windvector_{}_{}_{}___{}{}{}{}{}{}.png'.format(month, day, year, \
-            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    ExportFig(fig, figure_directory, figtype, month, day, year)
+    
     plt.close() 
 
+    return
+
+
+def scatterplot(x, y, figure_directory, title=None, popup=False):
+    plt.xlabel('buffersize')
+    plt.ylabel('amount of plume grid cells')
+    
+    if title != None:
+        plt.title(title)
+    
+    plt.scatter(x, y)
+    curr_time = ut.GetCurrentTime()
+    plt.savefig(figure_directory + r'scatter_{}{}{}{}{}{}.png'.format(curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    plt.close()
+    
     return
