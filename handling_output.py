@@ -140,9 +140,9 @@ def Masking(masking, daily_data_dict, figtype):
 
 def Title(ax, title, figtype, year, month, day):
     if title != None:
-        ax.set_title(title, horizontalalignment='center', verticalalignment='top')
+        ax.set_title(title)
     else:
-        ax.set_title(f'Map of {figtype}, at: {year}/{month}/{day}', horizontalalignment='center', verticalalignment='top')
+        ax.set_title(f'Map of {figtype}, at: {year}/{month}/{day}')
     
     return ax
 
@@ -188,6 +188,7 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     # Create cartopy plot
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.gridlines(draw_labels=True)
     
     # Load topographical features from cartopy
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
@@ -216,7 +217,7 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     c2 = plt.Rectangle((0,0),1,1, facecolor=colors[2], edgecolor='black')
     c3 = plt.Rectangle((0,0),1,1, facecolor=colors[3], edgecolor='black')
     ax.legend([c0, c1, c2, c3], ["No Plume", "TROPOMI", "GFED", "TROPOMI + GFED"], \
-                       loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=4, \
+                       loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, \
                            fancybox=True, shadow=False)
 # =============================================================================
 #     rect = lambda color: plt.Rectangle((0,0),1,1, facecolor=color, edgecolor='black')
@@ -281,6 +282,7 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     # plot with cartopy
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.gridlines(draw_labels=True)
     
     # Apply mask
     field_mt = Masking(masking, daily_data_dict, figtype)
@@ -290,7 +292,7 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
         
     cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
-    cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
+    cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
     cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
     cb.set_label(labeltag)
     
@@ -355,6 +357,7 @@ def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, 
     # plot with cartopy
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.gridlines(draw_labels=True)
     
     # Add some cartopy features to the map
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
@@ -371,7 +374,7 @@ def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, 
             # Apply mask
             field_mt = Masking(masking, daily_data_dict, figtype)
             cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree(), zorder = 1)
-        cbaxes = fig.add_axes([0.2, 0.1, 0.6, 0.03]) 
+        cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
         cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
         cb.set_label(labeltag)
     
@@ -438,10 +441,10 @@ def histogram(array, figure_directory, month, day, year):
     return x
 
 
+
 # =============================================================================
-# 
 # def CreateMaskMap_Original(daily_data_dict, figtype, figure_directory, title=None, \
-#                   labels=["no plume", "plume"], colors=['white', 'red']):
+#                   labels=["not buffered", "buffered"], colors=['white', 'red']):
 #     """
 #     
 #     Fucntion to create a discrete color map of a 2D np.array
@@ -486,16 +489,16 @@ def histogram(array, figure_directory, month, day, year):
 #     ax = plt.axes(projection=ccrs.PlateCarree())
 #     
 #     # Load topographical features from cartopy
-#     rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
+#     #rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
 #     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-#     ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
+#     #ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
 #     states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
 #     lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
 #     
 #     # Add the topographical features to the map
-#     ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
+#     #ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
 #     ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
-#     ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
+#     #ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
 #     ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
 #     ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
 #     ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
@@ -518,5 +521,5 @@ def histogram(array, figure_directory, month, day, year):
 #     ExportFig(fig, figure_directory, figtype, month, day, year)
 # 
 #     plt.close()
-# 
 # =============================================================================
+

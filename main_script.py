@@ -60,7 +60,7 @@ apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
     
 # Outputs to be generated:
 gen_txt_plume_coord = False  # txt file with plume coordinates
-gen_fig_xCO = False          # figure with CO concentration (ppb)
+gen_fig_xCO = True          # figure with CO concentration (ppb)
 gen_fig_plume = True        # masked plume figure
 gen_fig_wind_vector = False  # wind vector field figure
 
@@ -140,14 +140,24 @@ for day in daily_data:
     gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
     
     # Buffer TROPOMI 
-    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 4) # Draw circular buffers around TROPOMI plumes
+    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 7) # Draw circular buffers around TROPOMI plumes
     GFED_plumes = plumes_buffered * gfed_array # Array with overlapping GFED and TROPOMI plumes
     GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
+    
+    
+# =============================================================================
+#     # Buffer GFED 
+#     gfed_buffered = raster.DrawCircularBuffer(gfed_array, radius = 7) # Draw circular buffers around TROPOMI plumes
+#     GFED_plumes = gfed_buffered * plumes # Array with overlapping GFED and TROPOMI plumes
+#     GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
+# =============================================================================
+    
+    
     
     # Now do the same for steel data?
     
     # Adding all arrays with different plume origins:
-    plumes = plumes + GFED_plumes #GFED_plumes
+    plumes = plumes + GFED_plumes
     
     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
        # 11: TROPOMI + GFED identified plume))
