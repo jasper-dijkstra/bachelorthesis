@@ -23,12 +23,14 @@ The rest of the script is built up as follows:
 
 """
 
+
 #--------------------
 # IMPORTING FUNCTIONS
 #--------------------
 import os
 from datetime import datetime
 import numpy as np
+import scipy as sp
 
 # Local imports
 import handling_input as inpt
@@ -37,7 +39,6 @@ import masking_functions as mask
 import raster_tools as raster
 import fetching_winddata as wind
 import utilities as ut
-
 
 #--------------------
 # PARAMETERS (user input)
@@ -54,15 +55,14 @@ target_lon = int(abs((lon_max-lon_min)/(7/110)))
 target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
 # Apply operations:
-use_wind_rotations = True   # rotate plumes in wind direction to improve results
+use_wind_rotations = False   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
-compare_with_GFED = False    # compare TROPOMI data with modelled wildfires from GFED
     
 # Outputs to be generated:
-gen_txt_plume_coord = True  # txt file with plume coordinates
+gen_txt_plume_coord = False  # txt file with plume coordinates
 gen_fig_xCO = False          # figure with CO concentration (ppb)
 gen_fig_plume = True        # masked plume figure
-gen_fig_wind_vector = True  # wind vector field figure
+gen_fig_wind_vector = False  # wind vector field figure
 
 # Setting other parameters
 max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
@@ -72,8 +72,8 @@ basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDI
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=None)
-
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
+del files[0:3]
 
 #%%
 #--------------------
@@ -125,10 +125,6 @@ for day in daily_data:
     neighbors = raster.CountNeighbors(plumes)  # Identify neighbors of each grid cell
     plumes[neighbors <= 1] = 0 # If there are 1 or fewer neighbors, undo identification as plume
     
-    # Appending data to dict
-    daily_data[day]['plume_mask'] = plumes
-    daily_data[day]['neighbors'] = neighbors
-    
     """ 2: Rotate in the wind, to check if (center of) plumes overlap multiple days """
     if use_wind_rotations:
         print('Wind rotations under construction!')
@@ -139,14 +135,25 @@ for day in daily_data:
 
         
  
-    """ 3: Check if all plumes overlap with a buffer around modelled GFED data """
-    if compare_with_GFED:
-        gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
-        gfed_buffered = raster.DrawCircularBuffer(gfed_array, radius = 4) # Draw circular buffers around GFED plumes
-        outarr = daily_data[day]['plume_mask'] * gfed_buffered # Only allow plumes within buffersize
-        daily_data[day]['plume_mask'] = outarr
-        daily_data[day]['GFED_emissions'] = gfed_array
-        daily_data[day]['GFED_buffers'] = gfed_buffered
+    """ 3: Check if plumes overlap with modelled GFED data, by drawing a buffer around TROPOMI data """
+
+    gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
+    
+    # Buffer TROPOMI 
+    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 4) # Draw circular buffers around TROPOMI plumes
+    GFED_plumes = plumes_buffered * gfed_array # Array with overlapping GFED and TROPOMI plumes
+    GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
+    
+    # Now do the same for steel data?
+    
+    # Adding all arrays with different plume origins:
+    plumes = plumes + GFED_plumes #GFED_plumes
+    
+    # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
+       # 11: TROPOMI + GFED identified plume))
+    
+    
+    daily_data[day]['plume_mask'] = plumes
 
 
 print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
@@ -179,3 +186,5 @@ for day in daily_data:
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
+
+

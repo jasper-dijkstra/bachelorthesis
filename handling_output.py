@@ -13,7 +13,7 @@ import numpy.ma as ma
 import numpy as np
 from scipy import ndimage
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import ListedColormap, BoundaryNorm
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
@@ -149,12 +149,12 @@ def Title(ax, title, figtype, year, month, day):
 
 def ExportFig(fig, figure_directory, figtype, month, day, year):
     curr_time = ut.GetCurrentTime()
-    fig.savefig(figure_directory + rf"fig_{figtype}_{month}_{day}_{year}___{curr_time['year']}{curr_time['month']}{curr_time['day']}{curr_time['hour']}{curr_time['minute']}{curr_time['second']}.png", bbox_inches='tight')
+    fig.savefig(figure_directory + rf"fig_{figtype}_{month}_{day}_{year}___{curr_time['year']}{curr_time['month']}{curr_time['day']}{curr_time['hour']}{curr_time['minute']}{curr_time['second']}.png", bbox_inches='tight', dpi=1200)
     
     return
 
-def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
-                  labels=["no plume", "plume"], colors=['white', 'red']):
+
+def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     """
     
     Fucntion to create a discrete color map of a 2D np.array
@@ -169,22 +169,13 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
         Name as in daily_data_dict of the np.array containing values to plot.
     figure_directory : string
         Directory where figures will be stored.
-    labels : list with strings, optional
-        Labels for each tick on colorbar. The default is ["no plume", "plume"].
-        NOTE! 'labels' must have the same length as 'colors'!
-    colors : list with strings, optional
-        colors for each tick on colorbar. The default is ['white', 'red'].
-        NOTE! 'colors' must have the same length as 'labels'!
+
 
     Returns
     -------
     Map saved as png in figure_directory.
 
     """
-    # Check if labels and colors have got the same lengths
-    if not len(labels) == len(colors):
-        print("Parameters 'labels' and 'colors' must have the same length!")
-        print("Setting to default: labels=[no plume, plume], colors=[white, red]")
     
     # Retrieving month, day and year
     day = daily_data_dict['day']
@@ -199,28 +190,40 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
     ax = plt.axes(projection=ccrs.PlateCarree())
     
     # Load topographical features from cartopy
-    rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-    ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
     states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
-    lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
     
     # Add the topographical features to the map
-    ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
     ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
-    ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
-    ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
     ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
     ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
     ax.patch.set_facecolor('None')
     
-    # Creating the figure
+    # Setting the colors to be used in the map
+    colors = ['white', '#006994', '#228b22', '#808000'] #[white, seablue, green, olive]
     cmap = ListedColormap(colors)
-    cs = plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, transform=ccrs.PlateCarree())
-    cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
-    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
-    cb.set_ticks([0, len(colors)-1])
-    cb.set_ticklabels(labels)
+    
+    # Setting the (discrete) boundaries of the map
+    bounds = [0,1,10,11,100]
+    norm = BoundaryNorm(bounds, cmap.N)
+    
+    # Plot the actual data in the map
+    plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, norm=norm, transform=ccrs.PlateCarree())
+    
+    # Create a legend with corresponding colors
+    c0 = plt.Rectangle((0,0),1,1, facecolor=colors[0], edgecolor='black')
+    c1 = plt.Rectangle((0,0),1,1, facecolor=colors[1], edgecolor='black')
+    c2 = plt.Rectangle((0,0),1,1, facecolor=colors[2], edgecolor='black')
+    c3 = plt.Rectangle((0,0),1,1, facecolor=colors[3], edgecolor='black')
+    ax.legend([c0, c1, c2, c3], ["No Plume", "TROPOMI", "GFED", "TROPOMI + GFED"], \
+                       loc='lower center', bbox_to_anchor=(0.5, -0.1), ncol=4, \
+                           fancybox=True, shadow=False)
+# =============================================================================
+#     rect = lambda color: plt.Rectangle((0,0),1,1, facecolor=color, edgecolor='black')
+#     legend = ax.legend([rect('white'), rect('#006994'), rect('#228b22'), rect('#808000')], \
+#                        ["no plume", "TROPOMI", "GFED", "TROPOMI + GFED"], loc='upper center',\
+#                            bbox_to_anchor=(0.5, 1.05), ncol=4, fancybox=True, shadow=True)
+# =============================================================================
 
     # Set title of figure
     ax = Title(ax, title, figtype, year, month, day)
@@ -231,6 +234,9 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None, \
     ExportFig(fig, figure_directory, figtype, month, day, year)
 
     plt.close()
+
+    return
+
 
 
 def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
@@ -298,7 +304,8 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     fig.savefig(figure_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
             curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
     plt.close()  
-
+    
+    return
 
 
 def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, \
@@ -394,3 +401,122 @@ def scatterplot(x, y, figure_directory, title=None, popup=False):
     plt.close()
     
     return
+
+
+def histogram(array, figure_directory, month, day, year):
+    
+    array = array.flatten()
+    
+    # Create Histogram
+    plt.figure()
+    plt.hist(array, bins=100, color=('#0080FF'), density=True)
+    plt.yscale('log')
+    #plt.xscale('log')
+    
+    # Draw and note line where the mean is located
+    plt.axvline(array.mean(), color=('#000000'), linestyle='dashed', linewidth=1)
+    min_ylim, max_ylim = plt.ylim()
+    plt.text(array.mean()+2.4, max_ylim*0.9, '\u03BC: {:.2f}'.format(array.mean()))
+    
+    # Draw and note line where the standard deviation is located
+    x = array.mean() + 2*array.std() #array.mean()+2*
+    
+    plt.axvline(x, color=('#000000'), linestyle='dashed', linewidth=1)
+    min_ylim, max_ylim = plt.ylim()
+    plt.text(x+2.1, max_ylim*0.7, '2\u03C3: {:.2f}'.format(2*array.std()))
+    
+    # Set labels
+    plt.xlabel('CO ppb')
+    plt.ylabel('Log of amount of grid cells')
+    
+    # Set Title
+    plt.title('Histogram of Carbon monoxide concentration against the total amount of grid cells')
+    
+    ExportFig(plt, figure_directory, 'histogram', month, day, year)
+
+    
+    return x
+
+
+# =============================================================================
+# 
+# def CreateMaskMap_Original(daily_data_dict, figtype, figure_directory, title=None, \
+#                   labels=["no plume", "plume"], colors=['white', 'red']):
+#     """
+#     
+#     Fucntion to create a discrete color map of a 2D np.array
+#     
+#     Parameters
+#     ----------
+#     daily_data_dict : dictionary
+#         daily_data[<day>], contains data about TROPOMI measurement per day.
+#         Contains at least: lat_min, lat_max, lon_min, lon_max, day, month, year,
+#         and np.array with values to plot and count_t.
+#     figtype : string
+#         Name as in daily_data_dict of the np.array containing values to plot.
+#     figure_directory : string
+#         Directory where figures will be stored.
+#     labels : list with strings, optional
+#         Labels for each tick on colorbar. The default is ["no plume", "plume"].
+#         NOTE! 'labels' must have the same length as 'colors'!
+#     colors : list with strings, optional
+#         colors for each tick on colorbar. The default is ['white', 'red'].
+#         NOTE! 'colors' must have the same length as 'labels'!
+# 
+#     Returns
+#     -------
+#     Map saved as png in figure_directory.
+# 
+#     """
+#     # Check if labels and colors have got the same lengths
+#     if not len(labels) == len(colors):
+#         print("Parameters 'labels' and 'colors' must have the same length!")
+#         print("Setting to default: labels=[no plume, plume], colors=[white, red]")
+#     
+#     # Retrieving month, day and year
+#     day = daily_data_dict['day']
+#     month = daily_data_dict['month']
+#     year = daily_data_dict['year']
+#     
+#     # Create a longitude and latitude np.meshgrid in target resolution
+#     lon, lat = CreateTargetLatLonGrid(daily_data_dict, figtype)
+#     
+#     # Create cartopy plot
+#     fig = plt.figure(figsize=(10,6))
+#     ax = plt.axes(projection=ccrs.PlateCarree())
+#     
+#     # Load topographical features from cartopy
+#     rivers_10m = cfeature.NaturalEarthFeature('physical', 'rivers_lake_centerlines', '10m')
+#     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+#     ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
+#     states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+#     lakes_50m = cfeature.NaturalEarthFeature('physical', 'lakes', '50m')
+#     
+#     # Add the topographical features to the map
+#     ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = cfeature.COLORS['water'], zorder=1) 
+#     ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
+#     ax.add_feature(rivers_10m, facecolor='None',linewidth=0.25, edgecolor=cfeature.COLORS['water'],zorder=3)
+#     ax.add_feature(lakes_50m, edgecolor='k',linewidth=0.25,facecolor='None',zorder=3) 
+#     ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
+#     ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
+#     ax.patch.set_facecolor('None')
+#     
+#     # Creating the figure
+#     cmap = ListedColormap(colors)
+#     cs = plt.pcolormesh(lon, lat, daily_data_dict[figtype], cmap = cmap, transform=ccrs.PlateCarree())
+#     cbaxes = fig.add_axes([0.27, 0.05, 0.1, 0.03]) 
+#     cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')
+#     cb.set_ticks([0, len(colors)-1])
+#     cb.set_ticklabels(labels)
+# 
+#     # Set title of figure
+#     ax = Title(ax, title, figtype, year, month, day)
+#     
+#     plt.ioff() # Preventing figures from appearing as pop-up
+#     
+#     # Saving figure
+#     ExportFig(fig, figure_directory, figtype, month, day, year)
+# 
+#     plt.close()
+# 
+# =============================================================================
