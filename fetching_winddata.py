@@ -37,7 +37,7 @@ def GetTimeZoneExtent(lon_min, lon_max, lat_min, lat_max, UTCzones, hour):
     xmax = np.nanmax(lon)
     
     # Get latitude (y) coordinates
-    lat[UTCzones != hour] = np.nan  # Set all lat's that are not <hour>, to 'nan' 
+    #lat[UTCzones != hour] = np.nan  # Set all lat's that are not <hour>, to 'nan' 
     ymin = np.nanmin(lat)
     ymax = np.nanmax(lat)
     
@@ -375,9 +375,9 @@ def FetchWindData(daily_data_dict, pressure, timerange):
     
     hourslist = list() # Initialize hourslist
     for i in range(len(count)):
-        if count[i] >= treshold: # Make sure value frequency is above treshold
+        if count[i] > treshold: # Make sure value frequency is above treshold
             hourslist.append(i)
-    
+    print(hourslist)
     
     # Initialize arrays for output wind arrays
     u_wind = np.zeros(UTCzones.shape)

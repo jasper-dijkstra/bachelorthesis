@@ -44,24 +44,24 @@ import utilities as ut
 # PARAMETERS (user input)
 #--------------------
 # Set the Target Boundaries (degrees)
-lon_min = 100
-lon_max = 160
-lat_min = -50
-lat_max = 0
+lon_min = 120 #100
+lon_max = 126 #160
+lat_min = -24 #-50
+lat_max = -18 #0
 boundaries = [lat_min, lat_max, lon_min, lon_max]
 
 # Setting the target resolution to ~7x7km
-target_lon = int(abs((lon_max-lon_min)/(7/110)))
-target_lat = int(abs((lat_max-lat_min)/(7/110)))
+target_lon = int(abs((lon_max-lon_min)/(14/110)))
+target_lat = int(abs((lat_max-lat_min)/(14/110)))
 
 # Apply operations:
-use_wind_rotations = False   # rotate plumes in wind direction to improve results
+use_wind_rotations = True   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
     
 # Outputs to be generated:
 gen_txt_plume_coord = False  # txt file with plume coordinates
-gen_fig_xCO = True          # figure with CO concentration (ppb)
-gen_fig_plume = True        # masked plume figure
+gen_fig_xCO = False          # figure with CO concentration (ppb)
+gen_fig_plume = False        # masked plume figure
 gen_fig_wind_vector = False  # wind vector field figure
 
 # Setting other parameters
@@ -95,7 +95,7 @@ for i, file in enumerate(files):
 
     # collect meteodata via ECMWF CDS API:
     if use_wind_rotations == True:
-        u_wind, v_wind = wind.FetchWindData(daily_data[i], pressure=1000, timerange=5)
+        u_wind, v_wind = wind.FetchWindData(daily_data[i], pressure=700, timerange=6)
         daily_data[i]['u_wind'] = u_wind
         daily_data[i]['v_wind'] = v_wind
 
@@ -190,11 +190,15 @@ for day in daily_data:
         fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateWindVector(daily_data[day], figtype = 'CO_ppb', figure_directory = fig_dir,\
                                 labeltag = 'ppb', title='CO concentration and wind at 1000 hPa',\
-                                    masking=True, skip=30)
+                                    masking=True, skip=5)
 
 
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
 
+#%%
+import handling_custom_outputs as cout
 
+fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
+cout.WindVector_IMG25(daily_data[0], 'CO_ppb', fig_dir, pressure='700')   

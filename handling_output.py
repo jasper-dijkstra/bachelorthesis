@@ -9,6 +9,7 @@ and to create discrete or continuous georeferenced figures of np.arrays
 
 """
 
+import warnings
 import numpy.ma as ma
 import numpy as np
 from scipy import ndimage
@@ -190,15 +191,22 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     ax = plt.axes(projection=ccrs.PlateCarree())
     ax.gridlines(draw_labels=True)
     
-    # Load topographical features from cartopy
-    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-    states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+    # Filter warnings leading to an error
+    warnings.filterwarnings('error')
     
-    # Add the topographical features to the map
-    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
-    ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
-    ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
-    ax.patch.set_facecolor('None')
+    try:
+        # Load topographical features from cartopy
+        land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+        states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+        
+        # Add the topographical features to the map
+        ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
+        ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
+        ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
+        ax.patch.set_facecolor('None')
+        
+    except Warning: # Is encountered above oceans, as there is no valid data
+        pass
     
     # Setting the colors to be used in the map
     colors = ['white', '#006994', '#228b22', '#808000'] #[white, seablue, green, olive]
@@ -391,54 +399,6 @@ def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, 
     return
 
 
-def scatterplot(x, y, figure_directory, title=None, popup=False):
-    plt.xlabel('buffersize')
-    plt.ylabel('amount of plume grid cells')
-    
-    if title != None:
-        plt.title(title)
-    
-    plt.scatter(x, y)
-    curr_time = ut.GetCurrentTime()
-    plt.savefig(figure_directory + r'scatter_{}{}{}{}{}{}.png'.format(curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
-    plt.close()
-    
-    return
-
-
-def histogram(array, figure_directory, month, day, year):
-    
-    array = array.flatten()
-    
-    # Create Histogram
-    plt.figure()
-    plt.hist(array, bins=100, color=('#0080FF'), density=True)
-    plt.yscale('log')
-    #plt.xscale('log')
-    
-    # Draw and note line where the mean is located
-    plt.axvline(array.mean(), color=('#000000'), linestyle='dashed', linewidth=1)
-    min_ylim, max_ylim = plt.ylim()
-    plt.text(array.mean()+2.4, max_ylim*0.9, '\u03BC: {:.2f}'.format(array.mean()))
-    
-    # Draw and note line where the standard deviation is located
-    x = array.mean() + 2*array.std() #array.mean()+2*
-    
-    plt.axvline(x, color=('#000000'), linestyle='dashed', linewidth=1)
-    min_ylim, max_ylim = plt.ylim()
-    plt.text(x+2.1, max_ylim*0.7, '2\u03C3: {:.2f}'.format(2*array.std()))
-    
-    # Set labels
-    plt.xlabel('CO ppb')
-    plt.ylabel('Log of amount of grid cells')
-    
-    # Set Title
-    plt.title('Histogram of Carbon monoxide concentration against the total amount of grid cells')
-    
-    ExportFig(plt, figure_directory, 'histogram', month, day, year)
-
-    
-    return x
 
 
 
