@@ -81,7 +81,7 @@ def filter_csv_by_bbox(csvfile, bbox):
 # IMPORTING AND EXPORTING CSV FILES
 #----------------------------------
 
-def CSVtoDf(csv_file):
+def CSVtoDf(csv_file, bbox):
     """
     --------
     Parameters:
@@ -91,8 +91,19 @@ def CSVtoDf(csv_file):
         list with all grid cells that fall within bbox for input within timeframe of csv file
     """
     
+    # Dataframe header values
     CO_header = ['lat0', 'lat1', 'lat2', 'lat3', 'lat', 'lon0', 'lon1', 'lon2', 'lon3', 'lon', 'xco', 'xco_unc', 'xco_ppb', 'xco_ppb_unc', 'qa', 'weekday', 'day', 'month', 'aerosol_opthick', 'aerosol_layer', 'orbitnr', 'time']
+    
+    # Read the csv file as Pandas DataFrame
     COdata = pd.read_csv(csv_file, header=None, names=CO_header)
+    
+    # Identify if observations falls within latlon range
+    COdata['valid'] = (COdata['lat'] >= bbox[0]) & (COdata['lat'] < bbox[1]) \
+        & (COdata['lon'] >= bbox[2]) & (COdata['lon'] < bbox[3])
+    
+    # Remove all values that do not fall within latlon range
+    COdata = COdata.drop(COdata[COdata['valid'] == False].index)
+    del COdata['valid']
     
     return COdata
 
@@ -124,7 +135,7 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
     lon_max = bbox[3]
     
     
-    COdata = CSVtoDf(csvfile) # Reading csv as pd.dataframe
+    COdata = CSVtoDf(csvfile, bbox) # Reading csv as pd.dataframe
     COdata = COdata.to_numpy() # Transforming pd.dataframe to np.array
 
     # Convert TROPOMI timestamp to UTC date, time floats
