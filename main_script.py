@@ -15,14 +15,12 @@ The rest of the script is built up as follows:
         Data is stored in dictionaries (daily_data_dict)
     - MAIN MODEL:
         Using a moving window, highest values are separated from background
-        !wind rotations!
-        If desired, TROPOMI plumes can be compared to data from the Global Fire Emissions Database
+        TROPOMI plumes can be compared to data from the Global Fire Emissions Database
     - HANDLING OUTPUT:
         If desired, textfiles containing plume coordinates are generated
         If desired, figures are generated
 
 """
-
 
 #--------------------
 # IMPORTING FUNCTIONS
@@ -30,7 +28,6 @@ The rest of the script is built up as follows:
 import os
 from datetime import datetime
 import numpy as np
-import scipy as sp
 
 # Local imports
 import handling_input as inpt
@@ -40,20 +37,26 @@ import raster_tools as raster
 import fetching_winddata as wind
 import utilities as ut
 
-#--------------------
-# PARAMETERS (user input)
-#--------------------
+
+#%%
+# ========================================================
+# USER DEFINED PARAMETERS
+# ========================================================
+
+# == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 120 #100
-lon_max = 126 #160
-lat_min = -24 #-50
-lat_max = -18 #0
+lon_min = 100 #120
+lon_max = 160 #126
+lat_min = -50 #-24
+lat_max = 0 #-18
 boundaries = [lat_min, lat_max, lon_min, lon_max]
 
 # Setting the target resolution to ~7x7km
-target_lon = int(abs((lon_max-lon_min)/(14/110)))
-target_lat = int(abs((lat_max-lat_min)/(14/110)))
+target_lon = int(abs((lon_max-lon_min)/(7/110)))
+target_lat = int(abs((lat_max-lat_min)/(7/110)))
 
+
+# == Desired Behaviour ==
 # Apply operations:
 use_wind_rotations = True   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
@@ -61,24 +64,38 @@ apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
 # Outputs to be generated:
 gen_txt_plume_coord = False  # txt file with plume coordinates
 gen_fig_xCO = False          # figure with CO concentration (ppb)
-gen_fig_plume = False        # masked plume figure
+gen_fig_plume = True        # masked plume figure
 gen_fig_wind_vector = False  # wind vector field figure
 
 # Setting other parameters
 max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
 
-# Setting the data working directory
-basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR')
+
+# == Directories ==
+# Main Directory
+basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Documents\Python\00_bachelorthesis\bachelorthesis\THESIS_WORKINGDIR\\')
+
+# Directory where GFED files are stored
+GFED_path = os.path.join(basepath, '01_GFED_hdf5_files' + os.path.sep) # Path to gfed hdf5 files
+
+
+# ========================================================
+# NON-USER DEFINED PARAMETERS
+# ========================================================
+
+# Output directories, for coordinates and figures
+coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_coordinates'))
+fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'\02_output\plume_figures'))
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
-del files[0:3]
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=None)
+
 
 #%%
-#--------------------
+# ========================================================
 # Initialization
-#--------------------
+# ========================================================
 # Setting the time of starting the script
 start = datetime.now()
 
@@ -95,7 +112,7 @@ for i, file in enumerate(files):
 
     # collect meteodata via ECMWF CDS API:
     if use_wind_rotations == True:
-        u_wind, v_wind = wind.FetchWindData(daily_data[i], pressure=700, timerange=6)
+        u_wind, v_wind = wind.FetchWindData(daily_data[i], pressure=700, timerange=6, basepath=basepath)
         daily_data[i]['u_wind'] = u_wind
         daily_data[i]['v_wind'] = v_wind
 
@@ -104,9 +121,9 @@ print('Total time elapsed reading data: {}'.format(datetime.now()-start))
 
 
 #%%
-#--------------------
-# MAIN MODEL
-#--------------------
+# ========================================================
+# DETECTION ALGORITHM
+# ========================================================
 start_main = datetime.now()
 
 
@@ -125,34 +142,22 @@ for day in daily_data:
     neighbors = raster.CountNeighbors(plumes)  # Identify neighbors of each grid cell
     plumes[neighbors <= 1] = 0 # If there are 1 or fewer neighbors, undo identification as plume
     
-    """ 2: Rotate in the wind, to check if (center of) plumes overlap multiple days """
-    if use_wind_rotations:
-        print('Wind rotations under construction!')
-        # Wildfires tend to occur less than one day!
-        # Draw rectangle around it, size depending on size plume (find ideal size)
-        # Rotate within rectangle, so plume will be alligned with wind direction
-        # Reference this with plumes we found at other days???
-
-        
  
-    """ 3: Check if plumes overlap with modelled GFED data, by drawing a buffer around TROPOMI data """
+    """ 2: Check if plumes overlap with modelled GFED data, by drawing a buffer around TROPOMI data """
 
-    gfed_array = inpt.ReadGFED(daily_data[day]) # Read GFED data as array
+    gfed_array = inpt.ReadGFED(daily_data[day], GFED_path) # Read GFED data as array
     
     # Buffer TROPOMI 
     plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 7) # Draw circular buffers around TROPOMI plumes
     GFED_plumes = plumes_buffered * gfed_array # Array with overlapping GFED and TROPOMI plumes
     GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
-    
-    
+
 # =============================================================================
 #     # Buffer GFED 
 #     gfed_buffered = raster.DrawCircularBuffer(gfed_array, radius = 7) # Draw circular buffers around TROPOMI plumes
 #     GFED_plumes = gfed_buffered * plumes # Array with overlapping GFED and TROPOMI plumes
 #     GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
 # =============================================================================
-    
-    
     
     # Now do the same for steel data?
     
@@ -162,43 +167,43 @@ for day in daily_data:
     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
        # 11: TROPOMI + GFED identified plume))
     
-    
     daily_data[day]['plume_mask'] = plumes
+    
+    
+    """ 3: Rotate in the wind, to check if (center of) plumes overlap multiple days """
+    if use_wind_rotations:
+        print('Wind rotations not available!')
+        # Wildfires tend to occur less than one day!
+        # Draw rectangle around it, size depending on size plume (find ideal size)
+        # Rotate within rectangle, so plume will be alligned with wind direction
+        # Reference this with plumes we found at other days???
+    
+
 
 
 print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
 
 #%%
-#--------------------
-# HANDLING OUTPUT
-#--------------------
+# ========================================================
+# GENERATING OUTPUTS
+# ========================================================
 start_end = datetime.now()
 
 # Generate desired outputs based on earlier set preferences
 for day in daily_data:
     if gen_txt_plume_coord == True:
-        coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_coordinates'))
         output.NotePlumeCoordinates(daily_data[day], coord_dir)
     if gen_fig_xCO == True:
-        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateColorMap(daily_data[day], 'CO_ppb', fig_dir, labeltag = 'ppb')
     if gen_fig_plume == True:
-        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)
     if gen_fig_wind_vector == True:
         assert use_wind_rotations == True, 'use_wind_rotations has to be True before wind vectorfield can be created!'
-        fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
         output.CreateWindVector(daily_data[day], figtype = 'CO_ppb', figure_directory = fig_dir,\
                                 labeltag = 'ppb', title='CO concentration and wind at 1000 hPa',\
                                     masking=True, skip=5)
 
 
-
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
 
-#%%
-import handling_custom_outputs as cout
-
-fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_figures'))
-cout.WindVector_IMG25(daily_data[0], 'CO_ppb', fig_dir, pressure='700')   

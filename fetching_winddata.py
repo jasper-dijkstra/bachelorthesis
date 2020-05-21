@@ -95,7 +95,7 @@ def GetCorrectDates(zone_extents, daily_data_dict, timerange):
 
 
 
-def DownloadMeteo(zone_extents, timescope, pressure_level=850):
+def DownloadMeteo(zone_extents, timescope, basepath, pressure_level=850):
     """
     This function downloads ERA5 data making use of the CDS API from Copernicus,
     as netCDF4 files for the time- and aerial scope defined in daily_data_dict
@@ -106,7 +106,10 @@ def DownloadMeteo(zone_extents, timescope, pressure_level=850):
     timescope : output of GetCorrectDates()
     pressure_level : int
         Atmospheric pressure level (hPa) at which data has to be downloaded
-
+    basepath : string
+        Path to folder where meteodata will be stored
+        
+        
     Returns
     -------
     downloaded .nc file in: (<working_dir>/store_meteo_data/<subdir>).
@@ -125,8 +128,8 @@ def DownloadMeteo(zone_extents, timescope, pressure_level=850):
     hours = timescope[3]
     
     # Setting output directory
-    curr_directory = os.getcwd()
-    out_dir = os.path.join(curr_directory, rf'store_meteo_data/{years[0]}/{months[0]}/{days[0]}')
+    #curr_directory = os.getcwd()
+    out_dir = os.path.join(basepath, rf'store_meteo_data/{years[0]}/{months[0]}/{days[0]}')
     ut.DefineAndCreateDirectory(out_dir)
     filename = f'ERA5_{hours[-1][:2]}h_Lon[{lon_min}_{lon_max}]_Lat[{lat_min}_{lat_max}]_{pressure_level}hPa.nc'
     
@@ -329,7 +332,7 @@ def RescaleWindArray(daily_data_dict, zone_extents, ERA5):
     return uwind, vwind, lon_m, lat_m
 
 
-def FetchWindData(daily_data_dict, pressure, timerange):
+def FetchWindData(daily_data_dict, pressure, timerange, basepath):
     """
     Function to fetch meteorological data from ECMWF ERA5 on uwind and vwind:
         - for specified air pressure (in hPa)
@@ -343,7 +346,9 @@ def FetchWindData(daily_data_dict, pressure, timerange):
     pressure : integer
         Atmospheric pressure in hPa.
     timerange : int
-        DESCRIPTION.
+        Amount of hours to take into account before TROPOMI observation was done.
+    basepath : string
+        Path to folder where meteodata will be stored
 
     Returns
     -------
@@ -395,7 +400,7 @@ def FetchWindData(daily_data_dict, pressure, timerange):
         timescope = GetCorrectDates(zone_extents, daily_data_dict, timerange=int(timerange))
         
         # 3. Request meteodata via API
-        path = DownloadMeteo(zone_extents, timescope, pressure_level=pressure)
+        path = DownloadMeteo(zone_extents, timescope, basepath, pressure_level=pressure)
         
         # 4. Read requested meteodata as np.arrays
         ERA5 = OpenERA5(path, zone_extents, timerange=int(timerange))

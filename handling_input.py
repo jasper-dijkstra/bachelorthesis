@@ -219,7 +219,7 @@ def export_as_csv(csv_out_path, data):
     return
 
 
-def ReadGFED(daily_data_dict):
+def ReadGFED(daily_data_dict, gfed_folder):
     """
     This function reads HDF5 data from the Global Fire Emissions Database (GFED),
     and then resample it to the desired resolution. GFED data from 2017 onwards,
@@ -230,6 +230,8 @@ def ReadGFED(daily_data_dict):
     ----------
     daily_data_dict : dictionary
         dictionary containing daily_data per day [<day>].
+    gfed_folder : string
+        path to GFED folder where download GFED HDF5 file is stored
     
     Returns
     -------
@@ -251,12 +253,7 @@ def ReadGFED(daily_data_dict):
     
     
     # STEP 2: READ THE DATA FROM THE HDF5 FILE
-    # Get Path of current script
-    full_path = str(os.path.realpath('__file__'))
-    path, _ = os.path.split(full_path)
-    
-    # Navigate to the correct hdf5 folder
-    gfed_filename = str(path + r'\GFED_fire_emissions_mask\GFED4.1s_{}_beta.hdf5'.format(year))
+    gfed_filename = str(os.path.join(gfed_folder + rf'GFED4.1s_{year}_beta.hdf5'))
     f = h5py.File(gfed_filename, mode='r')
     
     # Get daily fire and lat/lon data from hdf5 file
