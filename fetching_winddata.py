@@ -129,7 +129,7 @@ def DownloadMeteo(zone_extents, timescope, basepath, pressure_level=850):
     
     # Setting output directory
     #curr_directory = os.getcwd()
-    out_dir = os.path.join(basepath, rf'store_meteo_data/{years[0]}/{months[0]}/{days[0]}')
+    out_dir = os.path.join(basepath, rf'03_Store_meteo_data/{years[0]}/{months[0]}/{days[0]}')
     ut.DefineAndCreateDirectory(out_dir)
     filename = f'ERA5_{hours[-1][:2]}h_Lon[{lon_min}_{lon_max}]_Lat[{lat_min}_{lat_max}]_{pressure_level}hPa.nc'
     

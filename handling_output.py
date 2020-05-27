@@ -81,6 +81,7 @@ longitudes: [{lon_min}, {lon_max}]
 latitudes: [{lat_min}, {lat_max}] 
 
 column descriptions:
+- type:         Plume identified in: (1: TROPOMI, 2: GFED, 3: TROPOMI + GFED)
 - latitude:     Latitude of center of plume
 - longitude:    Longitude of center of plume
 - grid_cells:   Amount of grid cells (~7x7km) in plume
@@ -102,7 +103,9 @@ latitude, longitude, grid_cells, CO_max, CO_average,
         y = int(indices[i][0])
         x_co_max = int(max_xco[i][1])
         y_co_max = int(max_xco[i][0])
-        f.write("{}; {}; {}; {}; {};\n".format(lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
+        plume_origin = 1 if (plume_mask[y,x] == 1) else 2 if (plume_mask[y,x] == 10) \
+            else 3 if (plume_mask[y,x] == 11) else 0
+        f.write("{}; {}; {}; {}; {};\n".format(plume_origin, lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
     f.close()
     
     return
@@ -189,7 +192,10 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     # Create cartopy plot
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.gridlines(draw_labels=True)
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    
     
     # Filter warnings leading to an error
     warnings.filterwarnings('error')
@@ -198,8 +204,11 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
         # Load topographical features from cartopy
         land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
         states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+        ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
+
         
         # Add the topographical features to the map
+        ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = '#d0d0d0', zorder=1) 
         ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
         ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
         ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
@@ -209,11 +218,13 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
         pass
     
     # Setting the colors to be used in the map
-    colors = ['white', '#006994', '#228b22', '#808000'] #[white, seablue, green, olive]
+    #colors = ['#16060C', '#FF7621', '#FEB504', '#9F5244'] # original
+    #colors = [black (0), yellow(1), green(10), yg(11), deepblue(100), marineblue(101), white(111)]
+    colors = ['#16060C', '#FF7621', '#FEB504', '#9F5244', '#083554', '#246D94', '#FFFFFF']
     cmap = ListedColormap(colors)
     
     # Setting the (discrete) boundaries of the map
-    bounds = [0,1,10,11,100]
+    bounds = [0,1,10,11,100,101,111,112]
     norm = BoundaryNorm(bounds, cmap.N)
     
     # Plot the actual data in the map
@@ -224,7 +235,10 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     c1 = plt.Rectangle((0,0),1,1, facecolor=colors[1], edgecolor='black')
     c2 = plt.Rectangle((0,0),1,1, facecolor=colors[2], edgecolor='black')
     c3 = plt.Rectangle((0,0),1,1, facecolor=colors[3], edgecolor='black')
-    ax.legend([c0, c1, c2, c3], ["No Plume", "TROPOMI", "GFED", "TROPOMI + GFED"], \
+    c4 = plt.Rectangle((0,0),1,1, facecolor=colors[4], edgecolor='black')
+    c5 = plt.Rectangle((0,0),1,1, facecolor=colors[5], edgecolor='black')
+    c7 = plt.Rectangle((0,0),1,1, facecolor=colors[6], edgecolor='black')
+    ax.legend([c0, c1, c2, c3, c4, c5, c7], ["No Plume", "TROPOMI", "GFED", "TROPOMI + GFED", "EDGAR", "TROPOMI + EDGAR", "All"], \
                        loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=4, \
                            fancybox=True, shadow=False)
 # =============================================================================
@@ -290,7 +304,9 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     # plot with cartopy
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.gridlines(draw_labels=True)
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
     
     # Apply mask
     field_mt = Masking(masking, daily_data_dict, figtype)
@@ -365,7 +381,9 @@ def CreateWindVector(daily_data_dict, figtype, figure_directory, masking=False, 
     # plot with cartopy
     fig = plt.figure(figsize=(10,6))
     ax = plt.axes(projection=ccrs.PlateCarree())
-    ax.gridlines(draw_labels=True)
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
     
     # Add some cartopy features to the map
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 

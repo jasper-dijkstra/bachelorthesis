@@ -10,15 +10,13 @@ This script contains standalone functions to:
     3. reading csv as pandas dataframe
     4. reading csv as np.array
     5. export to csv file
-    6. read data from Global Fire Emissions Database (hdf5)
+
 
 """
 
-import os
 import numpy as np
 import pandas as pd
 import csv
-import h5py
 
 import utilities as ut
 
@@ -108,7 +106,7 @@ def CSVtoDf(csv_file, bbox):
     return COdata
 
 
-def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
+def CSVtoArray(csvfile, bbox, target_lon, target_lat):
     """
     
     Parameters
@@ -119,7 +117,6 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
         List containing the minimum and maximum longitudes (x) and latitudes (y) for area of interest [lat_min, lat_max, lon_min, lon_max]
     target_lon
     target_lat
-    max_unc : maximum uncertainty in TROPOMI measurements
     
     Returns
     -------
@@ -154,26 +151,33 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat, max_unc=0.2):
     hour_1d = time['hour']
     
     
+    # Give indices with a too high a 'nodata' value
+    qa_indices = np.where((qa_1d <= 0.1) | (qa_1d >= 2.0))[0]
+    xco_ppb_1d[qa_indices] = np.nan
+    
     # Initiate arrays that save the observation totals for every pixel
     xco_ppb = np.zeros((target_lat, target_lon))
     qa = np.zeros((target_lat, target_lon))
     hour = np.zeros((target_lat, target_lon))
     count_t = np.zeros((target_lat, target_lon))
-    
+
 
     # reduce data resolution to target resolution
     for iobs in range(len(xco_ppb_1d)):
-        
-        #Calculate target pixel for the observation iobs    
-        ilon = np.int((lon[iobs] - lon_min)* target_lon / (lon_max - lon_min))
-        ilat = np.int((lat[iobs] - lat_min)* target_lat / (lat_max - lat_min))
-        
-        # Append iobs to correct ilat, ilon (indices) in 2d array
-        xco_ppb[ilat,ilon] += xco_ppb_1d[iobs]
-        qa[ilat,ilon] += qa_1d[iobs]
-        hour[ilat, ilon] += hour_1d[iobs]
-        count_t[ilat,ilon] += 1
+        if iobs != np.nan: # Make sure only valid observations are placed in grid
+            #Calculate target pixel for the observation iobs    
+            ilon = np.int((lon[iobs] - lon_min)* target_lon / (lon_max - lon_min))
+            ilat = np.int((lat[iobs] - lat_min)* target_lat / (lat_max - lat_min))
+            
+            # Append iobs to correct ilat, ilon (indices) in 2d array
+            xco_ppb[ilat,ilon] += xco_ppb_1d[iobs]
+            qa[ilat,ilon] += qa_1d[iobs]
+            hour[ilat, ilon] += hour_1d[iobs]
+            count_t[ilat,ilon] += 1
+        else:
+            pass
     
+
     # Removing data with a too high uncertainty
     #xco_ppb[qa < max_unc] = 0
     #hour[qa < max_unc] = 0
@@ -219,71 +223,3 @@ def export_as_csv(csv_out_path, data):
     return
 
 
-def ReadGFED(daily_data_dict, gfed_folder):
-    """
-    This function reads HDF5 data from the Global Fire Emissions Database (GFED),
-    and then resample it to the desired resolution. GFED data from 2017 onwards,
-    is only available as Beta version. Therefore this function makes no distinction
-    in plume intensity.
-    
-    Parameters
-    ----------
-    daily_data_dict : dictionary
-        dictionary containing daily_data per day [<day>].
-    gfed_folder : string
-        path to GFED folder where download GFED HDF5 file is stored
-    
-    Returns
-    -------
-    array of same resoultion and scope as described in daily_data_dict, with GFED values
-    
-    """
-    
-    # STEP 1: OBTAIN DATA FROM DAILY_DATA_DICT
-    # Define lat/lon ranges of target
-    lat_min = daily_data_dict['lat_min']
-    lat_max = daily_data_dict['lat_max']
-    lon_min = daily_data_dict['lon_min']
-    lon_max = daily_data_dict['lon_max']
-    
-    # Define timescope
-    day = daily_data_dict['day']
-    month = daily_data_dict['month']
-    year = daily_data_dict['year']
-    
-    
-    # STEP 2: READ THE DATA FROM THE HDF5 FILE
-    gfed_filename = str(os.path.join(gfed_folder + rf'GFED4.1s_{year}_beta.hdf5'))
-    f = h5py.File(gfed_filename, mode='r')
-    
-    # Get daily fire and lat/lon data from hdf5 file
-    monthly_data = f['/emissions/{}/C'.format(month)][:]
-    daily_fraction = f['/emissions/{}/daily_fraction/day_{}'.format(month, day)][:]
-    data = np.multiply(monthly_data, daily_fraction)
-    lat_hdf = f['/lat'][:]
-    lat_hdf = lat_hdf[:, 0]
-    lon_hdf = f['/lon'][:]
-    lon_hdf = lon_hdf[0]
-    
-    
-    # STEP 3: RESAMPLE TO TARGET RESOLUTION
-    # Defining the lat and longitudinal ranges of output
-    latrange = np.linspace(lat_min, lat_max, len(daily_data_dict['CO_ppb']))
-    lonrange = np.linspace(lon_min, lon_max, len(daily_data_dict['CO_ppb'][0]))
-    
-    gfed = list()
-    for iobs in range(len(latrange)):
-                
-        #Calculate target pixel for the observation iobs
-        ilon = ((lonrange - lon_hdf[0]) / (lon_hdf[1] - lon_hdf[0])).astype('int')
-        ilat = ((latrange[iobs] - lat_hdf[0])/(lat_hdf[1]-lat_hdf[0])).astype('int')
-        
-        # Append data to correct lat/lon indices
-        gfed_row = data[ilat,ilon]
-        gfed.append(gfed_row)
-    gfed = np.array(gfed)
-    
-    # Set all values > 0 to 1
-    #gfed[gfed > 0] = 1
-    
-    return gfed

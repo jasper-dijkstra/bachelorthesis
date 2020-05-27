@@ -20,7 +20,7 @@ import numpy as np
 import collections
 
 
-def MovingWindow(arr, function, window = (100,100), step = 20, treshold = 0.5):
+def MovingWindow(arr, function, window = (100,100), step = 20):
     """
     Function to apply moving window on 2D np.array <arr>. 
     <function> will be applied on <window>, that moves with steps of size <step>
@@ -67,7 +67,8 @@ def MovingWindow(arr, function, window = (100,100), step = 20, treshold = 0.5):
         x += step
     
 
-    field = (field/count).astype(int)
+    field = field/count#.astype(int)
+    #field = np.divide(field, count, where=(count != 0))
     
     return field
 

@@ -31,6 +31,8 @@ import numpy as np
 
 # Local imports
 import handling_input as inpt
+import handling_GFED as GFED
+import handling_EDGAR as EDGAR
 import handling_output as output
 import masking_functions as mask
 import raster_tools as raster
@@ -38,37 +40,33 @@ import fetching_winddata as wind
 import utilities as ut
 
 
-#%%
+
 # ========================================================
 # USER DEFINED PARAMETERS
 # ========================================================
 
 # == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 100 #120
-lon_max = 160 #126
-lat_min = -50 #-24
-lat_max = 0 #-18
+lon_min = 100 #129 #120 #100 #100 #
+lon_max = 160 #133 #126 #110 #160 #
+lat_min = -50 #-22 #-24 #-30 #-50 #
+lat_max = 0 #-18 #-40 #0 #
 boundaries = [lat_min, lat_max, lon_min, lon_max]
 
-# Setting the target resolution to ~7x7km
-target_lon = int(abs((lon_max-lon_min)/(7/110)))
-target_lat = int(abs((lat_max-lat_min)/(7/110)))
-
+# Setting the approximate target resolution
+lonres = 7 # km
+latres = 7 # km
 
 # == Desired Behaviour ==
 # Apply operations:
-use_wind_rotations = True   # rotate plumes in wind direction to improve results
+use_wind_rotations = False   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
     
 # Outputs to be generated:
 gen_txt_plume_coord = False  # txt file with plume coordinates
-gen_fig_xCO = False          # figure with CO concentration (ppb)
+gen_fig_xCO = True          # figure with CO concentration (ppb)
 gen_fig_plume = True        # masked plume figure
 gen_fig_wind_vector = False  # wind vector field figure
-
-# Setting other parameters
-max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
 
 
 # == Directories ==
@@ -76,21 +74,26 @@ max_unc_ppb = 50        # Maximum uncertainty in TROPOMI data
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Documents\Python\00_bachelorthesis\bachelorthesis\THESIS_WORKINGDIR\\')
 
 # Directory where GFED files are stored
-GFED_path = os.path.join(basepath, '01_GFED_hdf5_files' + os.path.sep) # Path to gfed hdf5 files
-
+GFED_path = os.path.join(basepath, '01_GFED_hdf5_files' + os.path.sep) # Path to gfed .hdf5 files
+EDGAR_path = os.path.join(basepath, '02_EDGAR_files' + os.path.sep) # Path to EDGAR .nc files
 
 # ========================================================
 # NON-USER DEFINED PARAMETERS
 # ========================================================
 
+# Calculating resolution based on lonres, latres
+target_lon = int(abs((lon_max-lon_min)/(lonres/110)))
+target_lat = int(abs((lat_max-lat_min)/(latres/110)))
+
+
 # Output directories, for coordinates and figures
-coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'plume_coordinates'))
-fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath, r'\02_output\plume_figures'))
+coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath + r'\04_output\plume_coordinates'))
+fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath + r'\04_output\plume_figures'))
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=None)
-
+files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
+del files[0:3]
 
 #%%
 # ========================================================
@@ -103,7 +106,7 @@ start = datetime.now()
 daily_data = {}
 for i, file in enumerate(files):    
     # Reading daily csv's as input array
-    daily_data[i] = inpt.CSVtoArray(file, boundaries, target_lon, target_lat, max_unc_ppb)
+    daily_data[i] = inpt.CSVtoArray(file, boundaries, target_lon, target_lat)
     
     # Filter measurements taken above the oceans (higher uncertainty)
     if apply_land_sea_mask == True:
@@ -144,26 +147,27 @@ for day in daily_data:
     
  
     """ 2: Check if plumes overlap with modelled GFED data, by drawing a buffer around TROPOMI data """
-
-    gfed_array = inpt.ReadGFED(daily_data[day], GFED_path) # Read GFED data as array
     
-    # Buffer TROPOMI 
+    # Read GFED and EDGAR data
+    gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data[day]['day'], \
+                               daily_data[day]['month'], daily_data[day]['year'], lonres, latres)
+    industry_file = 'v432_CO_2012_IPCC_1A2.0.1x0.1.nc' # EDGAR indsutry filename 
+    edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + industry_file), boundaries, lonres, latres)
+            
+    # Draw Buffer around TROPOMI plumes
     plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 7) # Draw circular buffers around TROPOMI plumes
-    GFED_plumes = plumes_buffered * gfed_array # Array with overlapping GFED and TROPOMI plumes
-    GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
-
-# =============================================================================
-#     # Buffer GFED 
-#     gfed_buffered = raster.DrawCircularBuffer(gfed_array, radius = 7) # Draw circular buffers around TROPOMI plumes
-#     GFED_plumes = gfed_buffered * plumes # Array with overlapping GFED and TROPOMI plumes
-#     GFED_plumes[GFED_plumes > 0] = 10 # Setting all GFED plumes to value 10
-# =============================================================================
     
-    # Now do the same for steel data?
+    # Delete GFED and EDGAR values outside of plume buffer
+    gfed_array = plumes_buffered * gfed_array # GFED within TROPOMI
+    edgar_array = plumes_buffered * edgar_array # EDGAR within TROPOMI
+    
+    gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
+    edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
     
     # Adding all arrays with different plume origins:
-    plumes = plumes + GFED_plumes
+    plumes = plumes + gfed_array + edgar_array
     
+    plumes[plumes == 110] = 0 # Not interested in GFED + EDGAR
     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
        # 11: TROPOMI + GFED identified plume))
     
@@ -206,4 +210,3 @@ for day in daily_data:
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
-
