@@ -4,80 +4,19 @@ Created on Mon Mar 30 12:25:51 2020
 
 @author: Jasper Dijkstra, edited from scripts from M. Riet, S. Houweling and I. Dekker
 
-This script contains standalone functions to:
-    1. filter TROPOMI csv CO data by day
-    2. filter TROPOMI csv CO data by area (bbox)
-    3. reading csv as pandas dataframe
-    4. reading csv as np.array
-    5. export to csv file
+
+This script contains functions to handle daily TROPOMI csv files.
+- Data required for plume detection algorithm is extracted and returned
 
 
 """
 
 import numpy as np
 import pandas as pd
-import csv
 
+# Local imports
 import utilities as ut
 
-#----------------------------------
-# FILTERING DATA FUNCTIONS
-#----------------------------------
-
-def filter_csv_by_day(csvfile, day):
-    """
-    --------
-    Parameters:
-        csvfile: path to .csv file containing monthly TROPOMI data on CO
-        day: Day of the data you want to filter
-    
-    Returns:
-        list with all grid cells that fall within selected day
-    """
-    
-    output_csv = []
-    with open(csvfile, newline='') as f:
-        reader = csv.reader(f)
-        for i, row in enumerate(reader):
-            if int(row[16]) == int(day):
-                output_csv.append(row) # Appending all output data
-        f.close()
-    return output_csv
-
-
-
-def filter_csv_by_bbox(csvfile, bbox):
-    """
-    --------
-    Parameters:
-        csvfile: path to .csv file containing monthly TROPOMI data on CO
-        bbox: List containing the minimum and maximum longitudes (x) and latitudes (y) for area of interest [lat_min, lat_max, lon_min, lon_max]
-    
-    Returns:
-        list with all grid cells that fall within bbox for input within timeframe of csv file
-    """
-    
-    # Defining boundaries
-    latmin = bbox[0]
-    latmax = bbox[1]
-    lonmin = bbox[2]
-    lonmax = bbox[3]
-    
-    output_csv = []
-    with open(csvfile, newline='') as f:
-        reader = csv.reader(f)
-        for i, row in enumerate(reader):
-            y = float(row[4]) # y (latitude) coordinate of center gridcell
-            x = float(row[9]) # x (longitude) coordinate of center gridcell
-            if x > lonmin and x < lonmax and y > latmin and y < latmax:
-                output_csv.append(row) # Appending all output data
-        f.close()
-    return output_csv
-
-
-#----------------------------------
-# IMPORTING AND EXPORTING CSV FILES
-#----------------------------------
 
 def CSVtoDf(csv_file, bbox):
     """
@@ -157,7 +96,6 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat):
     
     # Initiate arrays that save the observation totals for every pixel
     xco_ppb = np.zeros((target_lat, target_lon))
-    qa = np.zeros((target_lat, target_lon))
     hour = np.zeros((target_lat, target_lon))
     count_t = np.zeros((target_lat, target_lon))
 
@@ -171,27 +109,18 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat):
             
             # Append iobs to correct ilat, ilon (indices) in 2d array
             xco_ppb[ilat,ilon] += xco_ppb_1d[iobs]
-            qa[ilat,ilon] += qa_1d[iobs]
             hour[ilat, ilon] += hour_1d[iobs]
             count_t[ilat,ilon] += 1
         else:
             pass
     
-
-    # Removing data with a too high uncertainty
-    #xco_ppb[qa < max_unc] = 0
-    #hour[qa < max_unc] = 0
-    #count_t[qa < max_unc] = 0
-    
     # Apply correction for cells that overlap
     idx = (count_t > 0)
     xco_ppb[idx] = xco_ppb[idx]/count_t[idx]
-    #qa[idx] = qa[idx]/count_t[idx]
     hour[idx] = hour[idx]/count_t[idx]
     
     # Change all 'no data' values (count_t == 0) to np.nan
     hour[count_t == 0] = np.nan
-
    
     returndict = {'day':day, 'month':month, 'year':year, \
                   'lon_min':lon_min, 'lon_max':lon_max, 'lat_min':lat_min,\
@@ -201,25 +130,6 @@ def CSVtoArray(csvfile, bbox, target_lon, target_lat):
     return returndict
 
 
-def export_as_csv(csv_out_path, data):
-    """
 
-    Parameters
-    ----------
-    csv_out_path : string
-        Path to output csv file.
-    data : list
-        list that contains lists with data to be used as output.
-
-    Returns
-    -------
-    None.
-
-    """
-    with open(csv_out_path, "w", newline="") as f:
-        writer = csv.writer(f, delimiter=',')
-        writer.writerows(data)
-        f.close()
-    return
 
 

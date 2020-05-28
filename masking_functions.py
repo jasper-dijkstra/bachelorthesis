@@ -8,7 +8,7 @@ This script contains functions that return as masks over TROPOMI CO data (or any
 
 Functions:
     1. land/sea mask
-    2. Plume mask (3 functions)
+    2. Plume mask
     
 """
 
@@ -50,54 +50,7 @@ def land_sea_mask(array, boundaries):
     return land_arr
 
 
-def identify_enhancements(frame_array, q):
-    """
-    
-    Parameters
-    ----------
-    arr : np.array
-        2D np.array.
-    q : float (0-1)
-        Quantile that has to be considered as peak.
-
-    Returns
-    -------
-    arr : np.array
-        2D np.array, where the background has been removed (lower quantile) and the enhancements have been identified (upper quantile)
-
-    """
-    frame_array[frame_array == 0] = 'nan' # Change all zeros to 'nan' so they won't be taken into account
-    background = np.nanquantile(frame_array,q) # Define background concentration
-    frame_array = frame_array - background # Remove background from actual concentation
-    frame_array = np.nan_to_num(frame_array) # Rechange all 'nan' values to 0
-    frame_array[frame_array < 0] = 0 # Change all negative values to 0
-    frame_array[frame_array > 0] = 1 # Change all enhancements to 1
-    return frame_array
-
-
-def identify_enhancements_2(arr, q, st_devs = 1):
-    arr[arr == 0] = 'nan' # Change all zeros to 'nan' so they won't be taken into account
-    
-    #average_whole_frame = np.nanmean(arr)
-    stdev = st_devs*np.nanstd(arr)
-    
-    background = np.nanquantile(arr,q) # Define background concentration
-    
-    arr = arr - background # Remove background from actual concentation
-    
-    arr = arr - stdev # Remove also standard deviation, to make sure it really are peaks
-    
-    #arr[arr < 0] = 'nan' # Change all negative values to 0
-    
-    #average_quantile_frame = np.nanmean(arr)
-    
-    arr = np.nan_to_num(arr) # Rechange all 'nan' values to 0
-    arr[arr < 0] = 0 # Change all negative values to 0
-    arr[arr > 0] = 1 # Change all enhancements to 1
-    return arr
-
-
-def identify_enhancements_3(arr, st_devs=1):
+def identify_enhancements(arr, st_devs=1):
     """
 
     Parameters

@@ -11,13 +11,11 @@ All functions in this file:
     - CountNeighbors() - Defines the amount of direct neighbors (3x3 square) around each grid cell 
     - DrawCircularBuffer() - Apply a midpoint circle algorithm
     - ResampleArray() - Resample array to a different resolution.
-    - SetMostOccuring() - Define most occuring value in array, and assign this value to all cells
-    
 
 """
 
 import numpy as np
-import collections
+
 
 
 def MovingWindow(arr, function, window = (100,100), step = 20):
@@ -228,29 +226,3 @@ def ResampleArray(bbox, array, lon_resolution, lat_resolution):
     return data_reclassed
 
 
-def SetMostOccuring(arr):
-    """
-    Define most occuring value in array, and assign this value to all cells
-
-    If some values occur just as much as others, the median value will be assigned
-
-    """
-    
-    one_dimension = arr.flatten()
-    counts = collections.Counter(one_dimension).most_common(2)
-    #bincount = np.bincount(one_dimension)
-    #idx = np.where(bincount == np.max(bincount))[0]
-    
-    # Make sure 0 is not most occuring
-    try:
-        if counts[0][0] == 0:
-            one_dimension[:] = counts[1][0]
-        else:
-            one_dimension[:] = counts[0][0]
-    except IndexError:
-        one_dimension[:] = counts[0][0]
-
-    
-    outarr = one_dimension.reshape(arr.shape)
-    
-    return outarr

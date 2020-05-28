@@ -15,13 +15,13 @@ from datetime import datetime, timedelta
 from netCDF4 import Dataset
 import cdsapi
 import numpy as np
-import numpy.ma as ma
 from scipy.ndimage import gaussian_filter
 import os
 
 # Local imports
 import utilities as ut
 import raster_tools as raster
+
 
 def GetTimeZoneExtent(lon_min, lon_max, lat_min, lat_max, UTCzones, hour):
     # Get the extents of the timezone in which data has to be requested
@@ -92,7 +92,6 @@ def GetCorrectDates(zone_extents, daily_data_dict, timerange):
             list_.pop(0)
 
     return [years, months, days, hours]
-
 
 
 def DownloadMeteo(zone_extents, timescope, basepath, pressure_level=850):
@@ -206,80 +205,6 @@ def FindNearest(array, value):
     
     return idx
 
-    
-def ResampleWind(daily_data_dict, ERA5, zone_extents):
-    """
-    Function to resample the winddata from ERA5 to the TROPOMI resolution 
-
-    Parameters
-    ----------
-    daily_data_dict : TYPE
-        DESCRIPTION.
-    ERA5 : output of OpenERA5()
-    zone_extents : output of GetTimeZoneExtent()
-
-    Returns
-    -------
-    dict
-        dictionary with u_wind, v_wind, lat mesh, lon mesh and count for specified extent.
-
-    """
-    
-    # Assigning variables to ERA5 function output
-    lon_meteo = ERA5[0]
-    lat_meteo = ERA5[1]
-    u_wind = ERA5[2]
-    v_wind = ERA5[3]
-    
-    # Defining target boundaries from zone_extents
-    lat_min = zone_extents['lat_min']
-    lat_max = zone_extents['lat_max']
-    lon_min = zone_extents['lon_min']
-    lon_max = zone_extents['lon_max']
-    
-    # Setting target lon- and latitude
-    lon_res_out = daily_data_dict['target_lon']/(daily_data_dict['lon_max']-daily_data_dict['lon_min'])
-    lat_res_out = daily_data_dict['target_lat']/(daily_data_dict['lat_max']-daily_data_dict['lat_min'])
-    lon_res_in = len(lon_meteo)/(lon_meteo[-1]-lon_meteo[0])
-    lat_res_in = len(lat_meteo)/(lat_meteo[-1]-lat_meteo[0])
-    nlon_t = int(abs(len(lon_meteo)*(lon_res_out/lon_res_in)))
-    nlat_t = int(abs(len(lat_meteo)*(lat_res_out/lat_res_in)))
-    
-    # Creating (1D) lat/lon meshgrid from ranges
-    lonrange = np.linspace(lon_min, lon_max, nlon_t)
-    latrange = np.linspace(lat_min, lat_max, nlat_t)
-    lon, lat = np.meshgrid(lonrange, latrange)
-    
-    lon = np.ravel(lon)
-    lat = np.ravel(lat)
-    
-    # Creating arrays in the resolution of target
-    u_wind_t = np.zeros((nlat_t,nlon_t))
-    v_wind_t = np.zeros((nlat_t,nlon_t))
-    count_t = np.zeros((nlat_t,nlon_t))
-    
-    # increase data resolution to target resolution
-    for iobs in range(len(lon)):
-        
-        #Calculate target pixel for the observation iobs    
-        ilon = np.int((lon[iobs]+180.)*nlon_t/360.)
-        ilat = np.int((lat[iobs]+90.)*nlat_t/180.)
-        
-        # Get idices of nearest ERA5 index
-        m_ilon = FindNearest(lon_meteo, lon[iobs])
-        m_ilat = FindNearest(lat_meteo, lat[iobs])
-        
-        # Append nearest ERA5 index value to target pixel
-        u_wind_t[ilat,ilon] += u_wind[m_ilat, m_ilon]
-        v_wind_t[ilat,ilon] += v_wind[m_ilat, m_ilon]
-        count_t[ilat,ilon] += 1
-    
-    idx = (count_t > 0)
-    u_wind_t[idx] = u_wind_t[idx]/count_t[idx]
-    v_wind_t[idx] = v_wind_t[idx]/count_t[idx]
-    
-    return {'lon':lon, 'lat':lat, 'u_wind':u_wind_t, 'v_wind':v_wind_t}
-
 
 def RescaleWindArray(daily_data_dict, zone_extents, ERA5):
     """
@@ -382,7 +307,6 @@ def FetchWindData(daily_data_dict, pressure, timerange, basepath):
     for i in range(len(count)):
         if count[i] > treshold: # Make sure value frequency is above treshold
             hourslist.append(i)
-    print(hourslist)
     
     # Initialize arrays for output wind arrays
     u_wind = np.zeros(UTCzones.shape)
@@ -440,68 +364,3 @@ def FetchWindData(daily_data_dict, pressure, timerange, basepath):
     
     return u_wind, v_wind
 
-
-# =============================================================================
-# #=================================
-# # EXAMPLE
-# #=================================
-# import handling_output as out
-# import pickle
-# import tarfile
-# 
-# start = datetime.now()
-# 
-# # open a .spydata file
-# filename = r'C:\Users\jaspd\Documents\Python\00_bachelorthesis\bachelorthesis\data.spydata'
-# tar = tarfile.open(filename, "r")
-# # extract all pickled files to the current working directory
-# tar.extractall()
-# extracted_files = tar.getnames()
-# for f in extracted_files:
-#     if f.endswith('.pickle'):
-#          with open(f, 'rb') as fdesc:
-#              data = pickle.loads(fdesc.read())
-# 
-# # Identify inputs for _main_ function
-# daily_data_dict = data['daily_data'][3]
-# #pressure = 850
-# pressurerange = [600, 650, 700, 750, 800, 850, 900, 950, 1000] #hPa
-# timerange = 5
-# 
-# for pressure in pressurerange:
-#     u_wind, v_wind, c = FetchWindData(daily_data_dict, pressure, timerange)
-#     
-#     daily_data_dict['u_wind'] = u_wind
-#     daily_data_dict['v_wind'] = v_wind
-#     
-#     # Calculating wind speed (not direction!)
-#     windspeed = (u_wind ** 2 + v_wind ** 2) ** 0.5
-#     daily_data_dict['windspeed'] = windspeed
-#     
-#     
-#     #=====================
-#     # Plotting Figures
-#     
-#     fdir = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Desktop\THESIS_WORKINGDIR\plume_figures\wind_{}hPa'.format(pressure))
-#     
-#     
-#     
-#     # Create windspeed figure
-#     out.CreateColorMap(daily_data_dict, 'windspeed', fdir)
-#     
-#     # Create windspeed vector field + magnitude
-#     out.CreateWindVector(daily_data_dict, fdir, title='wind vectors + magnitude', vector_only=False)
-#     
-#     # Create windspeed vector field
-#     out.CreateWindVector(daily_data_dict, fdir, title='wind vectors', vector_only=True)
-#     
-#     # Create CO conc + vector field
-#     out.CreateWindVector(daily_data_dict, fdir, vector_only=False, labeltag='ppb', background='CO_ppb', title = 'CO concentrations in relation to wind at {}hPa'.format(pressure), masking=True)
-#     
-#     
-#     
-#     print('Total time elapsed: {}'.format(datetime.now()-start)) 
-# 
-# 
-# 
-# =============================================================================

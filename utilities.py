@@ -6,30 +6,31 @@ Created on Sun Apr 19 11:12:14 2020
 
 This script contains functions to:
     1. Check if directory exists, if not create it
-    2. List all csv files in directory
-    3. Get current time (year, month, day, hour, minute, second)
-    4. Convert UTC to modified Julian date 2010 ((C) Bram Maasakkers)
-    5. Convert modified Julian date 2010 to UTC ((C) Bram Maasakkers)
-    6. Check CO concentration (in ppb) for given lat/lon combination
+    2. List all files in directory
+    3. Export data to csv file
+    4. Get current time (year, month, day, hour, minute, second)
+    5. Convert UTC to modified Julian date 2010 ((C) Bram Maasakkers)
+    6. Convert modified Julian date 2010 to UTC ((C) Bram Maasakkers)
 
 """
 
 import os
+import csv
 from datetime import datetime
 import calendar
 import numpy as np
-import numpy.ma as ma
 
-import raster_tools as raster
-import masking_functions as maf
-
+# ==============================================
+# OS FUNCTIONS
+# ==============================================
 
 def DefineAndCreateDirectory(targetDirectory):
-    # Check if directory exists, and else create it
+    """
+    Check if directory exists, and else create it 
+    """
+    
     if not os.path.isdir(targetDirectory):
         os.makedirs(targetDirectory)
-        
-        # Add notification to log file
     
     # Make sure path ends with separator (//)
     if not targetDirectory.endswith(os.path.sep):
@@ -38,22 +39,54 @@ def DefineAndCreateDirectory(targetDirectory):
     return targetDirectory
 
 
-def ListCSVFilesInDirectory(inputDirectory, maxfiles=None):
-    # Check if directory exists, and else create it
-    if not os.path.isdir(inputDirectory):
-        print('This directory does not exist!')
-        # Add notification to logfile
-        return
+
+def ListFilesInDirectory(inputDirectory, extension='.csv', maxfiles=None):
+    """
+    list all files of given extension (default is '.csv') in a directory.
+    """
+    
+    # Check if directory exists, else raise AssertionError
+    assert os.path.isdir(inputDirectory), 'This directory does not exist!'
 
     files = []
     for file in os.listdir(inputDirectory):
         if maxfiles != None:
             if len(files) == maxfiles: break # Limit the amount of input days
-        if file.endswith(".csv"): files.append(os.path.join(inputDirectory, file))
+        if file.endswith(extension): files.append(os.path.join(inputDirectory, file))
         else:
             continue
     
     return files
+
+
+def ExportAsCSV(csv_out_path, data):
+    """
+    export data (lists) as a csv file
+
+    Parameters
+    ----------
+    csv_out_path : string
+        Path to output csv file.
+    data : list
+        list that contains lists with data to be used as output.
+
+    Returns
+    -------
+    None.
+
+    """
+    with open(csv_out_path, "w", newline="") as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerows(data)
+        f.close()
+    return
+
+
+
+
+# ==============================================
+# TIME CONVERSION FUNCTION
+# ==============================================
 
 def GetCurrentTime():
     now = datetime.now()
@@ -160,102 +193,7 @@ def ModifiedJulianDatetoUTC(mjd):
     return result
 
 
-def Get2DTime(arr, key):
-    """
-    
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        2D array with JulianDate values.
-    key : string
-        values that have to be retrieved from JulianDate.
-        Choose from: 'year', 'month', 'day', 'hour', 'minute', 'second', 'milisecond', 'day_of_year', 'fractional_year'
-
-    Returns
-    -------
-    arr : np.ndarray
-        2D array the size of arr, with values of desired key.
-
-    """
-    
-    keyslist = ['year', 'month', 'day', 'hour', 'minute', 'second', 'milisecond', 'day_of_year', 'fractional_year']
-    assert key in keyslist, 'key {key} is not recognised!'
-    
-    # Split 
-    flattened_arr = arr.flatten()
-    
-    # Identify indices with zero (no data) and nonzero values
-    nonzero_indices = np.where(flattened_arr != 0)
-    zero_indices = np.where(flattened_arr == 0)
-    
-    # Remove the zero values
-    timestamps_arr = np.delete(flattened_arr, zero_indices)
-    
-    # Compute <key> 
-    timestamps_arr = ModifiedJulianDatetoUTC(timestamps_arr)[key]
-    
-    # Create new array to return
-    out_arr = np.zeros(flattened_arr.shape)
-    for i in range(len(nonzero_indices[0])):
-        index = nonzero_indices[0][i]
-        out_arr[index] = timestamps_arr[i]
-
-    # Back to 2D array
-    out_arr = np.reshape(out_arr, arr.shape).astype(np.int)
-    
-    # Apply smoothing filter
-    #out_arr = raster.MovingWindow(out_arr, raster.SetMostOccuring, window=(10,10), step=5)
-    
-    # Mask original 0 values
-    out_arr[arr == 0] = 0
-    #out_arr = ma.array(out_arr, mask=mask)
-    
-    #print(f'min val = {np.min(out_arr)}')
-    #print(f'max val = {np.max(out_arr)}')
-    return out_arr
 
 
-
-
-
-
-
-
-def checkCO(daily_data_dict, lat, lon):
-    """
-    Check CO concentration (in ppb) for given lat/lon combination
-
-    Parameters
-    ----------
-    daily_data_dict : dictionary
-        daily_data[<day>], contains data about TROPOMI measurement per day.
-        Contains at least: lat_min, lat_max, lon_min, lon_max and CO_ppb
-    lat : float
-        latitude.
-    lon : float
-        longitude.
-
-    Returns
-    -------
-    CO_concentration : float
-        Carbon Monoxide concentration (in ppb) as measured by TROPOMI on specified day
-
-    """
-    
-    # Defining boundaries
-    assert daily_data_dict['lat_min'] < lat < daily_data_dict['lat_max'] \
-        and daily_data_dict['lon_min'] < lon < daily_data_dict['lon_max'], \
-            'given lat/lon combination is out of reach!'
-    
-    lonrange = np.linspace(daily_data_dict['lon_min'], daily_data_dict['lon_max'], len(daily_data_dict['CO_ppb'][0]))
-    latrange = np.linspace(daily_data_dict['lat_min'], daily_data_dict['lat_max'], len(daily_data_dict['CO_ppb']))
-    
-    # Get indices of lon and lat
-    ilon = (np.abs(lonrange - lon)).argmin()
-    ilat = (np.abs(latrange - lat)).argmin()
-    CO_concentration = daily_data_dict['CO_ppb'][ilat, ilon]
-    
-    return CO_concentration
 
     

@@ -51,7 +51,6 @@ lon_min = 100 #129 #120 #100 #100 #
 lon_max = 160 #133 #126 #110 #160 #
 lat_min = -50 #-22 #-24 #-30 #-50 #
 lat_max = 0 #-18 #-40 #0 #
-boundaries = [lat_min, lat_max, lon_min, lon_max]
 
 # Setting the approximate target resolution
 lonres = 7 # km
@@ -59,14 +58,14 @@ latres = 7 # km
 
 # == Desired Behaviour ==
 # Apply operations:
-use_wind_rotations = False   # rotate plumes in wind direction to improve results
+use_wind_rotations = True   # rotate plumes in wind direction to improve results
 apply_land_sea_mask = True  # filter out all TROPOMI data above the ocean
     
 # Outputs to be generated:
-gen_txt_plume_coord = False  # txt file with plume coordinates
+gen_txt_plume_coord = True  # txt file with plume coordinates
 gen_fig_xCO = True          # figure with CO concentration (ppb)
 gen_fig_plume = True        # masked plume figure
-gen_fig_wind_vector = False  # wind vector field figure
+gen_fig_wind_vector = True  # wind vector field figure
 
 
 # == Directories ==
@@ -80,6 +79,8 @@ EDGAR_path = os.path.join(basepath, '02_EDGAR_files' + os.path.sep) # Path to ED
 # ========================================================
 # NON-USER DEFINED PARAMETERS
 # ========================================================
+# Store all defined extents in a list:
+boundaries = [lat_min, lat_max, lon_min, lon_max]
 
 # Calculating resolution based on lonres, latres
 target_lon = int(abs((lon_max-lon_min)/(lonres/110)))
@@ -92,8 +93,8 @@ fig_dir = ut.DefineAndCreateDirectory(os.path.join(basepath + r'\04_output\plume
 
 # Create a list with all files to apply the analysis on
 input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-files = ut.ListCSVFilesInDirectory(input_files_directory, maxfiles=4)
-del files[0:3]
+files = ut.ListFilesInDirectory(input_files_directory, maxfiles=4)
+del files[0:3] # Make sure script only runs for October 13, 2018 #DELETE THIS LATER
 
 #%%
 # ========================================================
@@ -135,7 +136,7 @@ for day in daily_data:
     """ 1: At least 2 standard deviations above average of moving window """
     # Apply moving Window operation, with copy of CO_ppb
     arr = np.copy(daily_data[day]['CO_ppb'])
-    plumes = raster.MovingWindow(arr, mask.identify_enhancements_3, window = (100,100), step = 20) 
+    plumes = raster.MovingWindow(arr, mask.identify_enhancements, window = (100,100), step = 20) 
     
     # Check if plume was detected in at least 95% of windows
     plumes[plumes >= 0.95] = 1 # If true, plume (1)
@@ -146,7 +147,7 @@ for day in daily_data:
     plumes[neighbors <= 1] = 0 # If there are 1 or fewer neighbors, undo identification as plume
     
  
-    """ 2: Check if plumes overlap with modelled GFED data, by drawing a buffer around TROPOMI data """
+    """ 2: Check if plumes overlap with modelled GFED and EDGAR data, by drawing a buffer around TROPOMI data """
     
     # Read GFED and EDGAR data
     gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data[day]['day'], \
@@ -173,16 +174,11 @@ for day in daily_data:
     
     daily_data[day]['plume_mask'] = plumes
     
-    
     """ 3: Rotate in the wind, to check if (center of) plumes overlap multiple days """
     if use_wind_rotations:
         print('Wind rotations not available!')
-        # Wildfires tend to occur less than one day!
-        # Draw rectangle around it, size depending on size plume (find ideal size)
-        # Rotate within rectangle, so plume will be alligned with wind direction
-        # Reference this with plumes we found at other days???
-    
-
+        # Rotate identified plumes so they will be in line with the wind direction
+        # If plume occurs exclusively downwind, it can be validated as plume.
 
 
 print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
@@ -210,3 +206,12 @@ for day in daily_data:
 
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
+
+
+
+# =============================================================================
+
+# # column ??
+# xch4_col = (press_surf * xch4 * constants["avogadro"] / constants["mass"]["dry_air"] / constants["gravity"] / 1e4) / 6.022141E19 
+
+# =============================================================================
