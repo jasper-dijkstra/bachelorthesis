@@ -83,10 +83,10 @@ def identify_enhancements(arr, st_devs=1):
         arr[arr < average+stdev] = 0
         
     except Warning: # Is encountered above oceans, as there is no valid data
-        pass
+        average = np.nan
     
     arr = np.nan_to_num(arr) # Rechange all 'nan' values to 0
     arr[arr > 0] = 1 # Change all enhancements to 1 (masking them)
     
-    return arr
+    return arr, average
 

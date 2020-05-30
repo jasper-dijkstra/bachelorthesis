@@ -47,6 +47,9 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
     field = np.zeros((len(arr),len(arr[0])))
     count = np.zeros((len(arr),len(arr[0])))
     
+    # Define frame average, list with the average CO concentration per frame
+    average = list()
+    
     x = 0
     for xdir in range(int(len(arr[0])/step)):
         y = 0
@@ -55,12 +58,15 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
             count_frame = np.full((len(frame),len(frame[0])), 1) # Count frame
             
             # Analysis applied onto frame
-            frame = function(frame)
+            frame, frame_average = function(frame)
 
             #Append the moving window to the count and field arrays:
             field[y:y+window[1],x:x+window[0]] = frame[0:window[1],0:window[0]] + field[y:y+window[1],x:x+window[0]]
             count[y:y+window[1],x:x+window[0]] = count_frame[0:window[1],0:window[0]] + count[y:y+window[1],x:x+window[0]]
-    
+            
+            # Append the frame average to list
+            average.append(frame_average)
+            
             y += step
         x += step
     
@@ -68,7 +74,10 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
     field = field/count#.astype(int)
     #field = np.divide(field, count, where=(count != 0))
     
-    return field
+    # Return the average of the average list
+    avg = np.nanmean(np.array(average))
+    
+    return field, avg
 
 
 def CountNeighbors(arr):

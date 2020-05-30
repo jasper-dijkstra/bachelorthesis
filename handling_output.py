@@ -18,98 +18,17 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+# Local imports
 import utilities as ut
 
 
-def NotePlumeCoordinates(daily_data_dict, coord_directory):
-    """
-    
-    Parameters
-    ----------
-    daily_data_dict : dictionary
-        daily_data[<day>], contains data about TROPOMI measurement per day.
-    coord_directory : string
-        directory where list (txt file) of plume coordinates will be stored.
-
-    Returns
-    -------
-    Saves .txt file in coord_directory.
-
-    """
-    
-    # Defining boundaries
-    lat_min = daily_data_dict['lat_min']
-    lat_max = daily_data_dict['lat_max']
-    lon_min = daily_data_dict['lon_min']
-    lon_max = daily_data_dict['lon_max']
-    
-    # Deciding on the nlon_t and nlat_t
-    field_t = daily_data_dict['CO_ppb']
-    nlon_t = len(field_t[0])
-    nlat_t = len(field_t)
-    
-    # Get the indices of center of plume
-    plume_mask = daily_data_dict['plume_mask']
-    #indices = np.where(plume_mask == 1) 
-    plumes = plume_mask > 0 # Define data to be labelled
-    labels, nlabels = ndimage.label(plumes) # Label data
-    indices = ndimage.center_of_mass(plume_mask, labels, np.arange(nlabels) + 1) # Define center of mass of labeled plumes
-    max_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
-    mean_xco = ndimage.measurements.mean(field_t, labels, np.arange(nlabels) + 1)
-    plume_size = ndimage.labeled_comprehension(plume_mask, labels, np.arange(nlabels) + 1, np.sum, float, 0)
-    
-    # Generate coordinate meshgrid
-    lon_t = np.linspace(lon_min, lon_max, nlon_t)
-    lat_t = np.linspace(lat_min, lat_max, nlat_t)
-    lon, lat = np.meshgrid(lon_t, lat_t)
-    
-    # Write to txt file
-    day = daily_data_dict['day']
-    month = daily_data_dict['month']
-    year = daily_data_dict['year']
-    curr_time = ut.GetCurrentTime()
-    total = len(indices)
-    filename = coord_directory + \
-        'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
-    
-    headerstring = f"""#----------------------------------------
-#----------------------------------------
-This file was automatically generated at: {curr_time['year']}/{curr_time['month']}/{curr_time['day']} {curr_time['hour']}:{curr_time['minute']}
-
-This file contains a list with information on Carbon Monoxide plumes at {month}/{day}/{year}, between:
-longitudes: [{lon_min}, {lon_max}] 
-latitudes: [{lat_min}, {lat_max}] 
-
-column descriptions:
-- type:         Plume identified in: (1: TROPOMI, 2: GFED, 3: TROPOMI + GFED)
-- latitude:     Latitude of center of plume
-- longitude:    Longitude of center of plume
-- grid_cells:   Amount of grid cells (~7x7km) in plume
-- CO_max:       Highest Carbon Monoxide concentration measured in plume (ppb)
-- CO_average:   Average Carbon Monoxide concentration measured in plume (ppb)
-
-Total amount of plumes identified: {total}         
-             
-#----------------------------------------
-#----------------------------------------
-latitude, longitude, grid_cells, CO_max, CO_average,
-"""
-    
-    f = open(filename, 'w+')
-    f.write(headerstring)
-
-    for i in range(len(indices)):
-        x = int(indices[i][1])
-        y = int(indices[i][0])
-        x_co_max = int(max_xco[i][1])
-        y_co_max = int(max_xco[i][0])
-        plume_origin = 1 if (plume_mask[y,x] == 1) else 2 if (plume_mask[y,x] == 10) \
-            else 3 if (plume_mask[y,x] == 11) else 0
-        f.write("{}; {}; {}; {}; {};\n".format(plume_origin, lat[y, x], lon[y, x], plume_size[i], field_t[y_co_max, x_co_max], mean_xco[i]))
-    f.close()
-    
-    return
-
+# =============================================================================
+# # Correct data, for example if:
+#     # TROPOMI (1) gfed_tropomi (1) & GFED (10) = 12 -> 11
+# plumes[plumes == 12] = 11
+# plumes[plumes == 102] = 101
+# plumes[plumes == 112] = 111
+# =============================================================================
 
 
 def CreateTargetLatLonGrid(daily_data_dict, figtype):
@@ -203,15 +122,15 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     try:
         # Load topographical features from cartopy
         land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-        states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
+        #states_50m = cfeature.NaturalEarthFeature('cultural','admin_1_states_provinces_lines','50m')
         ocean_50m = cfeature.NaturalEarthFeature('physical', 'ocean', '50m') 
 
         
         # Add the topographical features to the map
         ax.add_feature(ocean_50m, edgecolor = 'face', facecolor = '#d0d0d0', zorder=1) 
         ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
-        ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
-        ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
+        #ax.add_feature(states_50m, edgecolor='gray',linewidth=0.25,facecolor='None',zorder=3)
+        #ax.add_feature(cfeature.BORDERS, edgecolor='#666666',linewidth=0.3,zorder=3)
         ax.patch.set_facecolor('None')
         
     except Warning: # Is encountered above oceans, as there is no valid data
@@ -219,8 +138,8 @@ def CreateMaskMap(daily_data_dict, figtype, figure_directory, title=None):
     
     # Setting the colors to be used in the map
     #colors = ['#16060C', '#FF7621', '#FEB504', '#9F5244'] # original
-    #colors = [black (0), yellow(1), green(10), yg(11), deepblue(100), marineblue(101), white(111)]
-    colors = ['#16060C', '#FF7621', '#FEB504', '#9F5244', '#083554', '#246D94', '#FFFFFF']
+    #colors = [black (0), yellow(1), green(10), yg(11), deepblue(100), lightblue(101), white(111)]
+    colors = ['#16060C', '#FF7621', '#FEB504', '#9F5244', '#083554', '#70CED0', '#FFFFFF']
     cmap = ListedColormap(colors)
     
     # Setting the (discrete) boundaries of the map
