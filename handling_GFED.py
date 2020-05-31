@@ -73,4 +73,7 @@ def OpenGFED(path, bbox, day, month, year, xres, yres):
     # Flipping the data, as for some reason it is upside down
     CO_emissions = np.flipud(CO_emissions)
     
-    return CO_emissions
+    # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+    CO_emissions[CO_emissions > 0] = 1
+    
+    return CO_emissions.astype(int)
