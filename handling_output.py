@@ -213,9 +213,9 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
 
     
     # Retrieving month, day and year
-    day = daily_data_dict['day']
-    month = daily_data_dict['month']
-    year = daily_data_dict['year']
+    #day = daily_data_dict['day']
+    #month = daily_data_dict['month']
+    #year = daily_data_dict['year']
     
     # Create a longitude and latitude np.meshgrid in target resolution
     lon, lat = CreateTargetLatLonGrid(daily_data_dict, figtype)
@@ -228,7 +228,9 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     gl.right_labels = False
     
     # Apply mask
-    field_mt = Masking(masking, daily_data_dict, figtype)
+    count_t = daily_data_dict['count_t']
+    mask = (count_t == 0) # Masking all zero values in count_t array   
+    field_mt = ma.array(daily_data_dict[figtype], mask=mask) # Apply this mask to figtype as well    
     
     # Add some cartopy features to the map
     land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
@@ -240,14 +242,13 @@ def CreateColorMap(daily_data_dict, figtype, figure_directory, masking=True, \
     cb.set_label(labeltag)
     
     # Set title of figure
-    ax = Title(ax, title, figtype, year, month, day)
+    #ax = Title(ax, title, figtype, year, month, day)
     
     plt.ioff() # Preventing figures from appearing as pop-up
     
     # Saving figure
     curr_time = ut.GetCurrentTime()
-    fig.savefig(figure_directory + r'fig_{}_{}_{}_{}___{}{}{}{}{}{}.png'.format(figtype, month, day, year, \
-            curr_time['year'], curr_time['month'], curr_time['day'], curr_time['hour'], curr_time['minute'], curr_time['second']), bbox_inches='tight')
+    fig.savefig(figure_directory + r'image.png', bbox_inches='tight')
     plt.close()  
     
     return

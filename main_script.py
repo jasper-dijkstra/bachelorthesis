@@ -26,6 +26,7 @@ The rest of the script is built up as follows:
 # IMPORTING FUNCTIONS
 #--------------------
 import os
+import copy
 from datetime import datetime
 import numpy as np
 
@@ -34,6 +35,7 @@ import handling_input as inpt
 import handling_GFED as GFED
 import handling_EDGAR as EDGAR
 import handling_output_textfiles as txt
+import handling_output_figures as figs
 import handling_output as output
 import masking_functions as mask
 import raster_tools as raster
@@ -48,10 +50,12 @@ import utilities as ut
 
 # == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 129 #120 #100 #100 #
-lon_max = 133 #126 #110 #160 #
-lat_min = -22 #-24 #-30 #-50 #
-lat_max = -18 #-40 #0 #
+lon_min = 100 #129 #120 #100 #100 #
+lon_max = 160 #133 #126 #110 #160 #
+lat_min = -50 #-22 #-24 #-30 #-50 #
+lat_max = 0 #-18 #-40 #0 #
+#boundaries = [-22, -18, 129, 133]
+#boundaries = [-50, 0, 100, 160]
 
 # Setting the approximate target resolution
 lonres = 14 # km
@@ -65,8 +69,7 @@ apply_overlap_filter = False # filter out plumes that occur for more than 3 cons
     
 # Outputs to be generated:
 gen_txt_plume_coord = True  # txt file with plume coordinates
-gen_fig_xCO = False          # figure with CO concentration (ppb)
-gen_fig_plume = True        # masked plume figure
+gen_figures = True          # figure with CO concentration (ppb) and mask (plume) as sublpot
 gen_fig_wind_vector = False  # wind vector field figure
 
 
@@ -87,7 +90,6 @@ boundaries = [lat_min, lat_max, lon_min, lon_max]
 # Calculating resolution based on lonres, latres
 target_lon = int(abs((lon_max-lon_min)/(lonres/110)))
 target_lat = int(abs((lat_max-lat_min)/(latres/110)))
-
 
 # Output directories, for coordinates and figures
 coord_dir = ut.DefineAndCreateDirectory(os.path.join(basepath + r'\04_output\plume_coordinates'))
@@ -137,7 +139,7 @@ start_main = datetime.now()
 for day in daily_data:
     """ 1: At least 2 standard deviations above average of moving window """
     # Apply moving Window operation, with copy of CO_ppb
-    arr = np.copy(daily_data[day]['CO_ppb'])
+    arr = copy.deepcopy(daily_data[day]['CO_ppb'])
     plumes, co_average = raster.MovingWindow(arr, mask.identify_enhancements, window = (100,100), step = 20) 
     
     # Check if plume was detected in at least 95% of windows
@@ -149,7 +151,7 @@ for day in daily_data:
     plumes[neighbors <= 1] = 0 # If there are 1 or fewer neighbors, undo identification as plume
     
     # Append to daily data dictionary
-    daily_data[day]['plume_mask'] = plumes
+    #daily_data[day]['plume_mask'] = plumes
     
     """ 2: Check if plumes overlap > 3 days """
     if apply_overlap_filter:
@@ -162,11 +164,8 @@ for day in daily_data:
             # Remove the values
             validity = lambda x: x * valid
             validity(daily_data[day-2]['plume_mask'])
-            validity(daily_data[day-2]['count_t'])
             validity(daily_data[day-1]['plume_mask'])
-            validity(daily_data[day-1]['count_t'])
             validity(daily_data[day]['plume_mask'])
-            validity(daily_data[day]['count_t'])
                
         else:
             pass
@@ -175,7 +174,7 @@ for day in daily_data:
     # next iteration 3 consecutive days are not detected
     
 
-for day in daily_data:
+#for day in daily_data:
     """ 3: Check if plumes overlap with modelled GFED and EDGAR data, by drawing a buffer around TROPOMI data """
     
     # Read GFED and EDGAR data
@@ -188,7 +187,7 @@ for day in daily_data:
     edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
     
     # Draw Buffer around TROPOMI plumes
-    plumes_buffered = raster.DrawCircularBuffer(daily_data[day]['plume_mask'], radius = 7) # Draw circular buffers around TROPOMI plumes
+    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = 7) # Draw circular buffers around TROPOMI plumes
 
     # Delete GFED and EDGAR values outside of plume buffer
     gfed_tropomi = (plumes_buffered * gfed_array) # GFED within TROPOMI
@@ -197,18 +196,14 @@ for day in daily_data:
     edgar_tropomi[edgar_tropomi > 0] = 1
     
     # Adding all arrays with different plume origins:
-    plumes = (daily_data[day]['plume_mask'] + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
+    plumes = (plumes + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
     
 
     
     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
        # 11: TROPOMI + GFED identified plume))
-    
     daily_data[day]['plume_mask'] = plumes
-    
-    
-    
-    
+
     
     """ 4: Rotate in the wind, to check if plume is detected downwind and not upwind """
     if use_wind_rotations:
@@ -227,13 +222,12 @@ start_end = datetime.now()
 
 # Generate desired outputs based on earlier set preferences
 for day in daily_data:
-    if gen_txt_plume_coord == True:
-        txt.NotePlumeCoordinates(daily_data[day], coord_dir, lonres, latres)
-    if gen_fig_xCO == True:
-        output.CreateColorMap(daily_data[day], 'CO_ppb', fig_dir, labeltag = 'ppb')
-    if gen_fig_plume == True:
-        output.CreateMaskMap(daily_data[day], 'plume_mask', fig_dir)
-    if gen_fig_wind_vector == True:
+    if gen_txt_plume_coord:
+        daily_data_dict = copy.deepcopy(daily_data[day])
+        txt.NotePlumeCoordinates(daily_data_dict, coord_dir, lonres, latres)
+    if gen_figures:
+        figs.PlotFigures(daily_data[day], basepath, subplots=True)
+    if gen_fig_wind_vector:
         assert use_wind_rotations == True, 'use_wind_rotations has to be True before wind vectorfield can be created!'
         output.CreateWindVector(daily_data[day], figtype = 'CO_ppb', figure_directory = fig_dir,\
                                 labeltag = 'ppb', title='CO concentration and wind at 1000 hPa',\
@@ -244,44 +238,3 @@ print('Total time elapsed generating output: {}'.format(datetime.now()-start_end
 print('total time elapsed: {}'.format(datetime.now()-start))
 
 
-
-# =============================================================================
-
-# # column ??
-# xch4_col = (press_surf * xch4 * constants["avogadro"] / constants["mass"]["dry_air"] / constants["gravity"] / 1e4) / 6.022141E19 
-
-# =============================================================================
-#%%
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-from matplotlib import colors
-
-def plot(arr):
-    
-    # Setting target lon- and latitude
-    nlon_t = len(arr[0])
-    nlat_t = len(arr)
-    
-    # Generate coordinate meshgrid
-    lon_t = np.linspace(boundaries[2], boundaries[3], nlon_t)
-    lat_t = np.linspace(boundaries[0], boundaries[1], nlat_t)
-    lon, lat = np.meshgrid(lon_t, lat_t)
-    
-    # plot with cartopy
-    fig = plt.figure(figsize=(10,6))
-    ax = plt.axes(projection=ccrs.PlateCarree())
-    gl = ax.gridlines(draw_labels=True)
-    gl.top_labels = False
-    gl.right_labels = False
-    
-    # Add some cartopy features to the map
-    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
-    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
-    
-    norm = colors.PowerNorm(gamma=0.25)
-    cs = plt.pcolormesh(lon, lat, arr, cmap='rainbow', norm=norm, transform=ccrs.PlateCarree())
-    cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
-    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
-    
-    plt.show()

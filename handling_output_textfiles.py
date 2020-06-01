@@ -2,7 +2,9 @@
 """
 Created on Sat May 30 09:34:30 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
+
+
 """
 
 import numpy as np
@@ -13,7 +15,7 @@ import utilities as ut
 
 
 def GetStats(daily_data_dict):
-    plumes = daily_data_dict['plume_mask'].flatten()
+    plumes = np.copy(daily_data_dict['plume_mask'].flatten())
     plumes = plumes[plumes > 0]
     frequency = np.bincount(plumes)
     
@@ -86,6 +88,7 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory, lonres, latres):
     plumes[plumes == 11] = 0    # Remove GFED within TROPOMI buffer
     plumes[plumes == 100] = 0   # Remove EDGAR
     plumes[plumes == 101] = 0   # Remove EDGAR within TROPOMI buffer
+    plumes[plumes == 110] = 0   # Remove EDGAR + GFED overlap
     # Now only TROPOMI plumes whose grid cells directly overlap with EDGAR or GFED-
     # are left. GFED and EDGAR within TROPOMI bufferzones are deleted
     # Values: [0 = No plume, 1 = TROPOMI, 12 = TROPOMI & GFED, 102 = TROPOMI & EDGAR
