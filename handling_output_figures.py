@@ -66,7 +66,7 @@ def PlotFigures(daily_data_dict, basepath, subplots=True):
 
 
 def CreatePlumesMap(lon, lat, plumes, out_name):
-    plt.figure(figsize=(10,6), dpi=1200)
+    plt.figure(figsize=(10,6))#, dpi=1200)
     
     ax = plt.axes(projection=ccrs.PlateCarree())
     gl = ax.gridlines(draw_labels=True)
@@ -96,7 +96,7 @@ def CreatePlumesMap(lon, lat, plumes, out_name):
                                fancybox=False, shadow=False, frameon=False)
            
     # Save the figure
-    plt.savefig(out_name, bbox_inches='tight', dpi=1200)
+    plt.savefig(out_name, bbox_inches='tight')#, dpi=1200)
     plt.cla()
     plt.clf()
     #plt.close()

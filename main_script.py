@@ -58,8 +58,8 @@ lat_max = 0 #-18 #-40 #0 #
 #boundaries = [-50, 0, 100, 160]
 
 # Setting the approximate target resolution
-lonres = 14 # km
-latres = 14 # km
+lonres = 10 # km
+latres = 10 # km
 
 # == Desired Behaviour ==
 # Apply operations:
@@ -237,4 +237,45 @@ for day in daily_data:
 print('Total time elapsed generating output: {}'.format(datetime.now()-start_end))
 print('total time elapsed: {}'.format(datetime.now()-start))
 
+
+# =============================================================================
+
+# # column ??
+# xch4_col = (press_surf * xch4 * constants["avogadro"] / constants["mass"]["dry_air"] / constants["gravity"] / 1e4) / 6.022141E19 
+
+# =============================================================================
+#%%
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from matplotlib import colors
+
+def plot(arr):
+    
+    # Setting target lon- and latitude
+    nlon_t = len(arr[0])
+    nlat_t = len(arr)
+    
+    # Generate coordinate meshgrid
+    lon_t = np.linspace(boundaries[2], boundaries[3], nlon_t)
+    lat_t = np.linspace(boundaries[0], boundaries[1], nlat_t)
+    lon, lat = np.meshgrid(lon_t, lat_t)
+    
+    # plot with cartopy
+    fig = plt.figure(figsize=(10,6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    
+    # Add some cartopy features to the map
+    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3) 
+    
+    norm = colors.PowerNorm(gamma=0.25)
+    cs = plt.pcolormesh(lon, lat, arr, cmap='rainbow', norm=norm, transform=ccrs.PlateCarree())
+    cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
+    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
+    
+    plt.show()
 

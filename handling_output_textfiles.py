@@ -20,10 +20,10 @@ def GetStats(daily_data_dict):
     frequency = np.bincount(plumes)
     
     # Make sure frequency has got enough indices to complete this function:
-    append_values = 113 - len(frequency)
+    append_values = 114 - len(frequency)
     frequency = np.lib.pad(frequency, ((0,append_values)), 'constant', constant_values=(0))
 
-    total_tropomi = frequency[1] + frequency[12] + frequency[112] 
+    total_tropomi = frequency[1] + frequency[12] + frequency[112] + frequency[113] 
     
     plumes[plumes == 12] = 11
     plumes[plumes == 102] = 101
@@ -45,7 +45,7 @@ def GetStats(daily_data_dict):
     unexplained = round(100 - exp_by_gfed - exp_by_edgar, 1)
     
     stats = [total_tropomi, exp_by_gfed, exp_by_edgar, unexplained]
-    
+
     return stats
 
 

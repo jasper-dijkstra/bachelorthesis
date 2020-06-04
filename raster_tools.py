@@ -43,6 +43,9 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
 
     """
     
+    # Assert window size is larger than or equal to step size, else values would be skipped
+    assert window[0] >= step and window[1] >= step, 'step size cannot be larger than window size!'
+    
     # Define the np.arrays where the data has to be appended on
     field = np.zeros((len(arr),len(arr[0])))
     count = np.zeros((len(arr),len(arr[0])))
@@ -70,9 +73,13 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
             y += step
         x += step
     
-
-    field = field/count#.astype(int)
-    #field = np.divide(field, count, where=(count != 0))
+# =============================================================================
+#     try:
+#         field = field/count#.astype(int)
+#     except RuntimeWarning:
+# =============================================================================
+        
+    field = np.divide(field, count, where=(count != 0))
     
     # Return the average of the average list
     avg = np.nanmean(np.array(average))
