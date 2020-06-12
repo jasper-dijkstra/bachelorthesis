@@ -7,6 +7,7 @@ Created on Sat May 30 09:34:30 2020
 
 """
 
+import os
 import numpy as np
 from scipy import ndimage
 
@@ -49,21 +50,24 @@ def GetStats(daily_data_dict):
     return stats
 
 
-def NotePlumeCoordinates(daily_data_dict, coord_directory, lonres, latres):
+def NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres):
     """
     
     Parameters
     ----------
     daily_data_dict : dictionary
         daily_data[<day>], contains data about TROPOMI measurement per day.
-    coord_directory : string
-        directory where list (txt file) of plume coordinates will be stored.
+    TODO!!!!!!!!!!!!!!ct (txt file) of plume coordinates will be stored.
 
     Returns
     -------
     Saves .txt file in coord_directory.
 
     """
+    
+    # Output directories, for coordinates and figures
+    coord_directory = ut.DefineAndCreateDirectory(os.path.join(basepath + r'\04_output\plume_coordinates'))
+    
     
     # Defining boundaries
     lat_min = daily_data_dict['lat_min']
@@ -116,8 +120,8 @@ def NotePlumeCoordinates(daily_data_dict, coord_directory, lonres, latres):
     year = daily_data_dict['year']
     curr_time = ut.GetCurrentTime()
     total = len(indices)
-    filename = coord_directory + \
-        'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year)
+    filename = os.path.join(coord_directory + \
+        'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year))
     
     headerstring = f"""#----------------------------------------
 #----------------------------------------
@@ -164,5 +168,7 @@ type; latitude; longitude; grid_cells; CO_max; CO_average;
                 else 'TROPOMI+GFED+EDGAR' if (plumes[y,x] == 112) else 'Unknown origin'
         f.write(f"{plume_origin}; {lat[y, x]}; {lon[y, x]}; {plume_size[i]}; {round(field_t[y_co_max, x_co_max], 3)}; {mean_xco[i]}\n")
     f.close()
+    
+    print(f'Generated: {filename}')
     
     return

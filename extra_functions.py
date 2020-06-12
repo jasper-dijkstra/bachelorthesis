@@ -2,7 +2,7 @@
 """
 Created on Thu May 28 12:16:24 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
 
 Script contains function that are no longer used in TROPOMI plume detection algorithm:
     - CheckCO() - Check CO concentration (in ppb) for given lat/lon combination
