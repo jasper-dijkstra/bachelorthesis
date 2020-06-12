@@ -2,7 +2,7 @@
 """
 Created on Wed May 13 15:18:23 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
 
 Raster functions, to be applied on 2D np.arrays
 
@@ -18,7 +18,7 @@ import numpy as np
 
 
 
-def MovingWindow(arr, function, window = (100,100), step = 20):
+def MovingWindow(arr, function, window = (100,100), step = 20, st_devs=1):
     """
     Function to apply moving window on 2D np.array <arr>. 
     <function> will be applied on <window>, that moves with steps of size <step>
@@ -61,7 +61,7 @@ def MovingWindow(arr, function, window = (100,100), step = 20):
             count_frame = np.full((len(frame),len(frame[0])), 1) # Count frame
             
             # Analysis applied onto frame
-            frame, frame_average = function(frame)
+            frame, frame_average = function(frame, st_devs)
 
             #Append the moving window to the count and field arrays:
             field[y:y+window[1],x:x+window[0]] = frame[0:window[1],0:window[0]] + field[y:y+window[1],x:x+window[0]]

@@ -2,7 +2,7 @@
 """
 Created on Wed Apr  1 14:23:54 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
 
 This script:
     1. creates monthly file of data within specified location using (splitted) csv files
