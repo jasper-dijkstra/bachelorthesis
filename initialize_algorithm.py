@@ -51,12 +51,12 @@ import main as init
 
 # == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 100 #129 #120 #100 #100 #
-lon_max = 160 #133 #126 #110 #160 #
-lat_min = -50 #-22 #-24 #-30 #-50 #
-lat_max = 0 #-18 #-40 #0 #
+lon_min = 100 #129 #120 #100 #100 # minimum longitude
+lon_max = 160 #133 #126 #110 #160 # maximum longitude
+lat_min = -50 #-22 #-24 #-30 #-50 # minimum latitude
+lat_max = 0 #-18 #-40 #0 # maximum latitude
 
-# Setting the approximate target resolution
+# Setting the approximate target resolution (> 7)
 lonres = 10 # km
 latres = 10 # km
 
@@ -64,14 +64,14 @@ latres = 10 # km
 # Main Directory
 basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Documents\Python\00_bachelorthesis\bachelorthesis\THESIS_WORKINGDIR\\')
 
-# Directory where GFED files are stored
+# Directory where GFED, EDGAR and CAMS files are stored
 GFED_path = os.path.join(basepath, '01_GFED_hdf5_files' + os.path.sep) # Path to gfed .hdf5 files
 EDGAR_path = os.path.join(basepath, '02_EDGAR_files' + os.path.sep) # Path to EDGAR .nc files
-
+CAMS_path = os.path.join(basepath, '02_Store_CAMS_data' + os.path.sep) # Path to CAMS .nc files
 
 # ========================================================
 # START ALGORITHM
 # ========================================================
 
-daily_data = init.PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path)
+daily_data = init.PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path)
 

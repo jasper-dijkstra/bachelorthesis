@@ -2,10 +2,9 @@
 """
 Created on Tue May 26 19:20:08 2020
 
-@author: jaspd
+@author: Jasper Dijkstra
 
-Open EDGAR
-
+Open the EDGAR database and only keep highest emissions as array
 
 Source: European Commission, Joint Research Centre (JRC)/Netherlands Environmental Assessment Agency (PBL). 
 Emission Databasefor Global Atmospheric Research (EDGAR), "http://edgar.jrc.ec.europe.eu"
@@ -20,6 +19,11 @@ import raster_tools as rast
 
 
 def OpenEDGAR(path, bbox, xres, yres):
+
+    # EDGAR longitudes range from 0-360, while TROPOMI does -180-180
+    # Therefore apply correction to bbox    
+    edgar_bbox = [bbox[0], bbox[1], bbox[2] + 180, bbox[3] + 180]
+
     # Open dataset
     fid = Dataset(path)
     
@@ -27,6 +31,11 @@ def OpenEDGAR(path, bbox, xres, yres):
     lon = fid.variables['lon'][:]
     lat = fid.variables['lat'][:]
     CO_emissions = fid.variables['emi_co'][:] #kg m-2 s-1
+    
+    # Put longitudes in correct order: [180 - 360] block to [-180 - 0]
+    west = np.squeeze(CO_emissions[:,np.where(lon > 180)])
+    east = np.squeeze(CO_emissions[:,np.where(lon <= 180)])
+    CO_emissions = np.concatenate((west,east),axis=1)
     
     # Close dataset
     fid.close()
@@ -38,13 +47,13 @@ def OpenEDGAR(path, bbox, xres, yres):
     stdev = np.nanstd(nanCO)
     CO_emissions[CO_emissions < mean+stdev] = 0
     
-    # Get indeces of latitudes and logitudes where desired extent is True
-    ilon = np.where((lon > bbox[2]) & (lon < bbox[3]))
-    ilat = np.where((lat > bbox[0]) & (lat < bbox[1]))
+    # Get indices of latitudes and logitudes where desired extent is True
+    ilon = np.where((lon > edgar_bbox[2]) & (lon < edgar_bbox[3]))
+    ilat = np.where((lat > edgar_bbox[0]) & (lat < edgar_bbox[1]))
     
     # Clip lon, lat and CO_emissions to desired extent 
-    lon = lon[(lon > bbox[2]) & (lon < bbox[3])]
-    lat = lat[(lat > bbox[0]) & (lat < bbox[1])]
+    lon = lon[ilon[0]]
+    lat = lat[ilat[0]]
     CO_emissions = CO_emissions[ilat[0], :]
     CO_emissions = CO_emissions[:, ilon[0]]
 
@@ -53,8 +62,5 @@ def OpenEDGAR(path, bbox, xres, yres):
     
     # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
     CO_emissions[CO_emissions > 0] = 1
-    
-    
+
     return CO_emissions
-
-

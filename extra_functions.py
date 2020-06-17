@@ -13,6 +13,22 @@ Script contains function that are no longer used in TROPOMI plume detection algo
 import numpy as np
 import collections
 
+# Local imports
+import masking_functions as mask
+
+
+
+def GetTotalLandCells(boundaries, target_lat, target_lon):
+    
+    # Initialize array from data
+    arr = np.ones((target_lat, target_lon))
+    
+    # Count amount of arrays that are land
+    land = mask.land_sea_mask(arr, boundaries)
+    total_land_cells = int(len(land[land != 0]))
+    
+    return total_land_cells
+
 
 def checkCO(daily_data_dict, lat, lon):
     """

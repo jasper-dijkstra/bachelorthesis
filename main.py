@@ -38,6 +38,7 @@ import handling_output_textfiles as txt
 import handling_output_figures as figs
 import masking_functions as mask
 import raster_tools as raster
+import fetching_CAMS as cams
 import fetching_winddata as wind
 import utilities as ut
 
@@ -66,7 +67,27 @@ def InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, b
 # Initialization (reading data)
 # ========================================================
 
-def CollectingData(boundaries, target_lon, target_lat, files, basepath, apply_land_sea_mask, use_wind_rotations):
+def ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path):
+    """
+    Assert user defined parameters will not raise errors later in the algorithm
+    """
+    # Assert sure extents fall within boundary
+    assert -180 <= lon_min <= 180 or -180 <= lon_max <= 180 or lon_min <= lon_max, 'maximum longitude cannot be smaller than or equal to minimum, and should be within range (-180, 180)!'
+    assert -90 <= lat_min <= 90 or -90 <= lat_max <= 90 or lat_min <= lat_max, 'maximum latitude cannot be smaller than or equal to minimum, and should be within range (-90, 90)!'
+    
+    # Assert resolution is larger than TROPOMI minimum:
+    assert lonres > 7, 'TROPOMI minimum longitude resolution is 7 km!'
+    assert latres > 7, 'TROPOMI minimum latitude resolution is 7 km!'
+    
+    # Assert if given directories exist
+    assert os.path.isdir(GFED_path), f'Directory {GFED_path} was not found!'
+    assert os.path.isdir(EDGAR_path), f'Directory {EDGAR_path} was not found!'
+    assert os.path.isdir(CAMS_path), f'Directory {CAMS_path} was not found!'
+    
+    return
+
+
+def CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_path, apply_land_sea_mask, use_wind_rotations, incorporate_cams):
     # Setting the time of starting the script
     start = datetime.now()
     
@@ -75,6 +96,15 @@ def CollectingData(boundaries, target_lon, target_lat, files, basepath, apply_la
     for i, file in enumerate(files):    
         # Reading daily csv's as input array
         daily_data[i] = inpt.CSVtoArray(file, boundaries, target_lon, target_lat)
+        
+        # Remove background, by CAMS observations
+        if incorporate_cams:
+            dates = [daily_data[i]['day'], daily_data[i]['month'], daily_data[i]['year']]
+            bbox = [daily_data[i]['lat_min'], daily_data[i]['lat_max'], daily_data[i]['lon_min'], daily_data[i]['lon_max']]
+            xres = int((110 * (bbox[3]-bbox[2])) / len(daily_data[i]['CO_ppb'][0]))
+            yres = int((110 * (bbox[1]-bbox[0])) / len(daily_data[i]['CO_ppb']))
+            cams_arr = cams.FetchCams(CAMS_path, dates, bbox, xres, yres)
+            daily_data[i]['CO_excl_background'] = daily_data[i]['CO_ppb'] - cams_arr
         
         # Filter measurements taken above the oceans (higher uncertainty)
         if apply_land_sea_mask:
@@ -96,7 +126,7 @@ def CollectingData(boundaries, target_lon, target_lat, files, basepath, apply_la
 # DETECTION ALGORITHM
 # ========================================================
 
-def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations):
+def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations, incorporate_cams):
     start_main = datetime.now()
     
     
@@ -104,7 +134,11 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
     for day in daily_data:
         """ 1: At least 2 standard deviations above average of moving window """
         # Apply moving Window operation, with copy of CO_ppb
-        arr = copy.deepcopy(daily_data[day]['CO_ppb'])
+        if incorporate_cams:
+            arr = copy.deepcopy(daily_data[day]['CO_excl_background'])
+        else:
+            arr = copy.deepcopy(daily_data[day]['CO_ppb'])
+        
         plumes, co_average = raster.MovingWindow(arr, mask.identify_enhancements, \
             window = (params[2],params[2]), step = params[3], st_devs = params[1]) 
         
@@ -121,23 +155,26 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
         
         """ 2: Check if plumes overlap > 3 days """
         if apply_overlap_filter:
-            if day >= 2:
-                # Identify plumes that occur > 3 days
-                overlap = daily_data[day]['plume_mask'] * daily_data[day-1]['plume_mask'] \
-                    * daily_data[day-2]['plume_mask']
-                valid = np.invert((overlap == 1)).astype(int)
-                
-                # Remove the values
-                validity = lambda x: x * valid
-                validity(daily_data[day-2]['plume_mask'])
-                validity(daily_data[day-1]['plume_mask'])
-                validity(daily_data[day]['plume_mask'])
-                   
-            else:
-                pass
-        
-        # PROBLEM: What if plume occurs 4 consecutive days? 0-3 are deleted,
-        # next iteration 3 consecutive days are not detected
+            print('Overlap filter not available!')
+# =============================================================================
+#             if day >= 2:
+#                 # Identify plumes that occur > 3 days
+#                 overlap = daily_data[day]['plume_mask'] * daily_data[day-1]['plume_mask'] \
+#                     * daily_data[day-2]['plume_mask']
+#                 valid = np.invert((overlap == 1)).astype(int)
+#                 
+#                 # Remove the values
+#                 validity = lambda x: x * valid
+#                 validity(daily_data[day-2]['plume_mask'])
+#                 validity(daily_data[day-1]['plume_mask'])
+#                 validity(daily_data[day]['plume_mask'])
+#                    
+#             else:
+#                 pass
+#         
+#         # PROBLEM: What if plume occurs 4 consecutive days? 0-3 are deleted,
+#         # next iteration 3 consecutive days are not detected
+# =============================================================================
         
     
     #for day in daily_data:
@@ -209,7 +246,15 @@ def GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, 
     return
 
 
-def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path):
+
+    
+# ========================================================
+# EXECUTE EVERYTHING IN CORRECT ORDER
+# ========================================================
+def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path):
+    # First check if all inputs are valid
+    ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path)
+    
     start = datetime.now()
     print(f'Algorithm started at: {start}')
     print('')
@@ -221,18 +266,20 @@ def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath,
         # windowsize (size of moving window frame in grid cells),
         # stepsize (steps between each moving window frame in grid cells)
         # ]
-    params = [7, 1, 120, 20]
+    params = [2, 2, 100, 70]
+    #params = [7, 1, 120, 20]
     
-    apply_land_sea_mask = True
+    apply_land_sea_mask = False
+    incorporate_cams = True
     apply_overlap_filter = False
     use_wind_rotations = False
     
     
     boundaries, target_lon, target_lat, files = InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath)
-    daily_data = CollectingData(boundaries, target_lon, target_lat, files, basepath, apply_land_sea_mask, use_wind_rotations)
+    daily_data = CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_path, apply_land_sea_mask, use_wind_rotations, incorporate_cams)
     print('')
     print('')
-    daily_data = Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations)
+    daily_data = Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations, incorporate_cams)
     print('')
     print('')
     GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, gen_fig_wind_vector=False,)
