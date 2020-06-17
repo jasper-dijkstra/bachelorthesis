@@ -146,24 +146,16 @@ EDGAR_path = os.path.join(basepath, '02_EDGAR_files' + os.path.sep) # Path to ED
 
 # Set modelparams
 windowsizes = list(np.linspace(30, 200, 18).astype(int))
-stepsizes = list(np.linspace(20, 100, 9).astype(int))
-#buffersizes = list(np.linspace(2, 15, 14).astype(int))
+#stepsizes = list(np.linspace(20, 100, 9).astype(int))
+buffersizes = list(np.linspace(2, 15, 14).astype(int))
 #stdevs = list(np.round(np.linspace(0.2, 3, 15), 1))
 
 # All loops that will have to be executed
-iterations = list(itertools.product(stepsizes, windowsizes))
-
-# Remove invalid combinations
-invalid_list = []
-for i in range(len(iterations)):
-    if iterations[i][0] >= iterations[i][1]:
-        invalid_list.append(i)
-iterations = [j for i, j in enumerate(iterations) if i not in invalid_list]
-
+iterations = list(itertools.product(buffersizes, windowsizes))
 
 # Set variables
-estimator = np.zeros((len(stepsizes), len(windowsizes))) # y-hat (total TROPOMI identifications)
-estimate = np.zeros((len(stepsizes), len(windowsizes))) # y (explained/correct TROPOMI identifications)
+estimator = np.zeros((len(buffersizes), len(windowsizes))) # y-hat (total TROPOMI identifications)
+estimate = np.zeros((len(buffersizes), len(windowsizes))) # y (explained/correct TROPOMI identifications)
 
 
 # ========================================================
@@ -199,7 +191,7 @@ for count, i in enumerate(iterations):
         # windowsize (size of moving window frame in grid cells),
         # stepsize (steps between each moving window frame in grid cells)
         # ]
-    params = [5, 1, i[1], i[0]]
+    params = [i[0], 1, i[1], 20]
     
     # Detection algorithm
     daily_data = init.Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations)
@@ -208,7 +200,7 @@ for count, i in enumerate(iterations):
     stats = GetStats(daily_data)
     
     # Identify locations indices to place data in array
-    x = np.where(stepsizes == iterations[count][0])[0]
+    x = np.where(buffersizes == iterations[count][0])[0]
     y = np.where(windowsizes == iterations[count][1])[0]
     
     # Append these statistics to array
@@ -219,19 +211,19 @@ for count, i in enumerate(iterations):
     if count in breaklist:
         index = np.where(np.array(breaklist) == count)[0][0] + 1
         print(f'{5*index}% complete')
-        print('going to sleep for 5 minutes...')
-        time.sleep(300)
+        #print('going to sleep for 5 minutes...')
+        #time.sleep(300)
 
 print('100% complete')
 print(f'Total time elapsed: {datetime.now()-starttime}')
 
 # Calculate Root mean Square Deviation and initialize X, Y coorindates
-X, Y = np.meshgrid(windowsizes, stepsizes)
+X, Y = np.meshgrid(windowsizes, buffersizes)
 
 # Where is difference TROPOMI and EXPLAINED the smallest -> Root mean square deviation?
 difference = estimator-estimate # Should negative values be filtered?
 RMSD = np.sqrt(((difference)**2)/GetTotalLandCells(boundaries, target_lat, target_lon))
-
+RMSD = RMSD / Y
 
 # Tips from Sander (socre function)
 y_tot = stats[2] # total sources according to edgar + gfed
@@ -239,7 +231,7 @@ y_pos = estimator # total identifications
 y_neg = estimator-estimate # total non-explained identifications
 #y_neg[y_neg <= 0] = 0 # Remove negative combinations -> more cells explained than identified?
 
-score = (y_pos - y_neg) #/ (Y)
+score = (y_pos - y_neg) / Y 
 
 # ============= CREATE OUTPUTS ==============
 # Store data as csv's
@@ -248,7 +240,7 @@ np.savetxt(os.path.join(os.getcwd() + rf"\score.csv"), score, delimiter=",")
 
 # Plot a pcolormesh (2D) image of results, saved in scripts workingdir
 xlabel = 'window length and width (x10 km)'
-ylabel = 'window step size (x10 km)'
+ylabel = 'radius buffer (x10 km)'
 cblabel = 'RMSD'
 
 Plot2D(X, Y, ma.array(RMSD, mask=(score == 0)), xlabel=xlabel, ylabel=ylabel, cblabel=cblabel)
