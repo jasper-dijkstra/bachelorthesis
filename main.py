@@ -177,14 +177,18 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
 # =============================================================================
         
     
-    #for day in daily_data:
+
         """ 3: Check if plumes overlap with modelled GFED and EDGAR data, by drawing a buffer around TROPOMI data """
         
         # Read GFED and EDGAR data
         gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data[day]['day'], \
                                    daily_data[day]['month'], daily_data[day]['year'], lonres, latres)
+        gfed_array[gfed_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+        
         edgar_file = 'v432_CO_2012.0.1x0.1.nc' # EDGAR indsutry filename 
         edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + edgar_file), boundaries, lonres, latres)
+        edgar_array[edgar_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+
         
         gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
         edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
@@ -251,7 +255,7 @@ def GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, 
 # ========================================================
 # EXECUTE EVERYTHING IN CORRECT ORDER
 # ========================================================
-def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path):
+def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path, params):
     # First check if all inputs are valid
     ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path)
     
@@ -260,16 +264,7 @@ def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath,
     print('')
     print('')
     
-    # params = [
-        # buffersize (radius of buffer around TROPOMI plumes),
-        # st.devs (minimum amount of st.devs within identification frames),
-        # windowsize (size of moving window frame in grid cells),
-        # stepsize (steps between each moving window frame in grid cells)
-        # ]
-    params = [2, 2, 100, 70]
-    #params = [7, 1, 120, 20]
-    
-    apply_land_sea_mask = False
+    apply_land_sea_mask = True
     incorporate_cams = True
     apply_overlap_filter = False
     use_wind_rotations = False

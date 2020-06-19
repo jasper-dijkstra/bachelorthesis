@@ -51,14 +51,28 @@ import main as init
 
 # == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 100 #129 #120 #100 #100 # minimum longitude
-lon_max = 160 #133 #126 #110 #160 # maximum longitude
-lat_min = -50 #-22 #-24 #-30 #-50 # minimum latitude
-lat_max = 0 #-18 #-40 #0 # maximum latitude
+lon_min = 100 #120 # 100 # minimum longitude
+lon_max = 160 #126  # 160 # maximum longitude
+lat_min = -50 #-24 # -50 # minimum latitude
+lat_max = 0 #-18 # 0 # maximum latitude
 
 # Setting the approximate target resolution (> 7)
 lonres = 10 # km
 latres = 10 # km
+
+buffersize = 5
+stdevs = 1.6
+windowsize = 180
+stepsize = 30
+
+# params = [
+    # buffersize (radius of buffer around TROPOMI plumes),
+    # st.devs (minimum amount of st.devs within identification frames),
+    # windowsize (size of moving window frame in grid cells),
+    # stepsize (steps between each moving window frame in grid cells)
+    # ]
+
+
 
 # == Directories ==
 # Main Directory
@@ -73,5 +87,7 @@ CAMS_path = os.path.join(basepath, '02_Store_CAMS_data' + os.path.sep) # Path to
 # START ALGORITHM
 # ========================================================
 
-daily_data = init.PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path)
+daily_data = init.PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
+                                 basepath, GFED_path, EDGAR_path, CAMS_path, \
+                                 params = [buffersize, stdevs, windowsize, stepsize])
 

@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from netCDF4 import Dataset
 import cdsapi
 import numpy as np
-from scipy.ndimage import gaussian_filter
 import os
 
 # Local imports

@@ -45,10 +45,11 @@ def PlotFigures(daily_data_dict, basepath, subplots=True):
 
     Returns
     -------
-    Figure(s) stored as png in '...'basepath'...\04_output\plume_figures'
+    Figure(s) stored as png in '...'basepath'.../04_output/plume_figures'
     
 
     """
+    
     # 1: DEFINING OUTPUT NAME AND STORAGE LOCATION
     # Creating output directory
     out_dir = ut.DefineAndCreateDirectory(os.path.join(basepath + os.path.sep + r'04_output\plume_figures'))
@@ -249,8 +250,7 @@ def CreateWindVector(daily_data_dict, basepath, skip=30):
 
     Returns
     -------
-    Figure(s) stored as png in '...'basepath'...\04_output\plume_figures'
-
+    Figure(s) stored as png in '...basepath...//04_output//plume_figures//'
 
     """
     

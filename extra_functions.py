@@ -5,16 +5,26 @@ Created on Thu May 28 12:16:24 2020
 @author: Jasper Dijkstra
 
 Script contains function that are no longer used in TROPOMI plume detection algorithm:
+    - GetTotalLandCells() - Get the total amount of grid cells above land
     - CheckCO() - Check CO concentration (in ppb) for given lat/lon combination
-    - SetMostOccuring() - Define most occuring value in array, and assign this value to all cells
+    - PlotDatabase() - Plot data from external databases (i.e. GFED, EDGAR, CAMS)
 
 """
 
+import os
 import numpy as np
-import collections
+import numpy.ma as ma
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 # Local imports
+import utilities as ut
+import handling_EDGAR as edgar
+import handling_GFED as gfed
+import fetching_CAMS as cams
 import masking_functions as mask
+
 
 
 
@@ -67,30 +77,85 @@ def checkCO(daily_data_dict, lat, lon):
     return CO_concentration
 
 
-def SetMostOccuring(arr):
+
+def PlotDatabase(dataset, in_path, out_path, bbox, xres, yres, day, month, year):
     """
-    Define most occuring value in array, and assign this value to all cells
+    Function to plot data from the GFED, EDGAR and CAMS databases.
+    
+    Parameters
+    ----------
+    dataset : string
+        Database from which data will be plotted. Can be 'GFED', 'EDGAR' or 'CAMS'
+    in_path : string
+        Path to folder containing file with data to be plotted.
+    out_path : string
+        Path to folder where output will be saved
+    bbox : boundaries [lat_min, lat_max, lon_min, lon_max]
+    day : day of TROPOMI overpass
+    month : month of TROPOMI overpass
+    year : year of TROPOMI overpass
+    xres : resolution in lon direction
+    yres : resolution in lat direction
 
-    If some values occur just as much as others, the median value will be assigned
-
+    Returns
+    -------
+    Figure, stored in out_path
+    
     """
     
-    one_dimension = arr.flatten()
-    counts = collections.Counter(one_dimension).most_common(2)
-    #bincount = np.bincount(one_dimension)
-    #idx = np.where(bincount == np.max(bincount))[0]
+    # Assert inputs are valid
+    assert dataset in ['GFED', 'EDGAR', 'CAMS']
+    if not os.path.isdir(in_path):
+        print(f'Directory {in_path} was not found!')
+        print(f'Creating {in_path} ...')
+    in_path = ut.DefineAndCreateDirectory(in_path)
+    out_path = ut.DefineAndCreateDirectory(out_path)
     
-    # Make sure 0 is not most occuring
-    try:
-        if counts[0][0] == 0:
-            one_dimension[:] = counts[1][0]
-        else:
-            one_dimension[:] = counts[0][0]
-    except IndexError:
-        one_dimension[:] = counts[0][0]
+    # Check which database to read/open
+    if dataset == 'GFED':
+        data = gfed.OpenGFED(in_path, bbox, day, month, year, xres, yres)
+        label = 'g C m^2 month^-1'
+    if dataset == 'EDGAR':
+        in_path = os.path.join(in_path + r'v432_CO_2012_IPCC_1A2.0.1x0.1.nc')
+        data = edgar.OpenEDGAR(in_path, bbox, xres, yres)
+        label = 'kg m-2 s-1'
+    if dataset == 'CAMS':
+        data = cams.FetchCams(in_path, dates=[day, month, year], bbox = bbox, xres = xres, yres = yres)
+        label = 'ppb'
+    
+    # Mask data values equal to zero
+    data = ma.array(data, mask=(data == 0))
 
+    # Latitude and Longitudinal ranges
+    latrange = np.linspace(bbox[0], bbox[1], data.shape[0])
+    lonrange = np.linspace(bbox[2], bbox[3], data.shape[1])
     
-    outarr = one_dimension.reshape(arr.shape)
+    lon, lat = np.meshgrid(lonrange, latrange)
     
-    return outarr
+    # plot with cartopy
+    fig = plt.figure(figsize=(10,6))
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    gl = ax.gridlines(draw_labels=True)
+    gl.top_labels = False
+    gl.right_labels = False
+    
+    # Add some cartopy features to the map
+    land_50m = cfeature.NaturalEarthFeature('physical', 'land', '50m') 
+    ax.add_feature(land_50m, edgecolor='k',linewidth=0.5,facecolor='None',zorder=3)
+    
+    cs = plt.pcolormesh(lon, lat, data, cmap='rainbow', transform=ccrs.PlateCarree())
+    cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
+    cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
+    cb.set_label(label)
+    
+    # Save the figure
+    out_name = os.path.join(out_path + rf'{dataset}_{bbox[0]}{bbox[1]}{bbox[2]}{bbox[3]}.png')
+    fig.savefig(out_name, bbox_inches='tight')#, dpi=1200)
+    
+    # Close the figure and clear the axes
+    plt.cla()
+    plt.clf()
+    plt.close()
+    
+    return
 

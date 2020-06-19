@@ -19,7 +19,25 @@ import raster_tools as rast
 
 
 def OpenEDGAR(path, bbox, xres, yres):
-
+    """
+    This function reads and resamples data from the Emission Database for Global Atmospheric Research (EDGAR)
+    
+    Only highest emissions will be considered as having a significant influence on the column mixing ratio as observed by TROPOMI
+    
+    Parameters
+    ----------
+    path : string
+        folder where gfed data is stored.
+    bbox : list, tuple
+        list, tuple with desired data extents [lat_min, lat_max, lon_min, lon_max]
+    xres, yres : int, float
+        desired resolution in longitudal direction (xres) and latitudal direction (y)
+        
+    Returns
+    -------
+    2d np.ndarray of desired resolution with EDGAR data for specified time scope (in kg m-2 s-1)
+    
+    """
     # EDGAR longitudes range from 0-360, while TROPOMI does -180-180
     # Therefore apply correction to bbox    
     edgar_bbox = [bbox[0], bbox[1], bbox[2] + 180, bbox[3] + 180]
@@ -60,7 +78,4 @@ def OpenEDGAR(path, bbox, xres, yres):
     # Reclassify EDGAR data to desired extent
     CO_emissions = rast.ResampleArray(bbox, CO_emissions, xres, yres)
     
-    # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
-    CO_emissions[CO_emissions > 0] = 1
-
     return CO_emissions
