@@ -67,7 +67,8 @@ def InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, b
 # Initialization (reading data)
 # ========================================================
 
-def ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path):
+def ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, \
+                   GFED_path, EDGAR_path, CAMS_path, behaviour_settings):
     """
     Assert user defined parameters will not raise errors later in the algorithm
     """
@@ -80,14 +81,44 @@ def ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath,
     assert latres > 7, 'TROPOMI minimum latitude resolution is 7 km!'
     
     # Assert if given directories exist
-    assert os.path.isdir(GFED_path), f'Directory {GFED_path} was not found!'
-    assert os.path.isdir(EDGAR_path), f'Directory {EDGAR_path} was not found!'
-    assert os.path.isdir(CAMS_path), f'Directory {CAMS_path} was not found!'
+    if behaviour_settings[1] == True:
+        assert os.path.isdir(CAMS_path), f'Directory {CAMS_path} was not found!'
+    if behaviour_settings[2] == True:
+        assert os.path.isdir(GFED_path), f'Directory {GFED_path} was not found!'
+        assert os.path.isdir(EDGAR_path), f'Directory {EDGAR_path} was not found!'
+
     
     return
 
 
-def CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_path, apply_land_sea_mask, use_wind_rotations, incorporate_cams):
+def CollectingData(boundaries, target_lon, target_lat, files, basepath, \
+                   CAMS_path, apply_land_sea_mask, use_wind_rotations, \
+                       incorporate_cams):
+    """
+    Opens the data required to execute plume detection algorithm
+
+    Parameters
+    ----------
+    boundaries : list, tuple
+        list, tuple with desired data extents [lat_min, lat_max, lon_min, lon_max]
+    target_lon : int, target latitude (grid cells)
+    target_lat : int, target longitude (grid cells)
+    files : list
+        List with all csv files containing TROPOMI data in directory.
+    basepath : str
+        Path to working directory (outputs will be stored here).
+    CAMS_path : str
+        Path to folder where CAMS files are stored
+    apply_land_sea_mask : bool
+    use_wind_rotations : bool
+    incorporate_cams : bool
+
+    Returns
+    -------
+    daily_data : dict
+        Dictionary with all data required to execute algorithm, sorted per day.
+
+    """
     # Setting the time of starting the script
     start = datetime.now()
     
@@ -126,11 +157,13 @@ def CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_pat
 # DETECTION ALGORITHM
 # ========================================================
 
-def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations, incorporate_cams):
+def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, \
+              apply_overlap_filter, use_wind_rotations, incorporate_cams, compare_gfed_edgar):
+    
+    # Note starting time of function
     start_main = datetime.now()
     
-    
-    """ Check for plumes based on three criteria: """
+    """ Check for plumes based on four criteria: """
     for day in daily_data:
         """ 1: At least 2 standard deviations above average of moving window """
         # Apply moving Window operation, with copy of CO_ppb
@@ -150,78 +183,66 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
         neighbors = raster.CountNeighbors(plumes)  # Identify neighbors of each grid cell
         plumes[neighbors <= 1] = 0 # If there are 1 or fewer neighbors, undo identification as plume
         
-        # Append to daily data dictionary
-        #daily_data[day]['plume_mask'] = plumes
         
         """ 2: Check if plumes overlap > 3 days """
         if apply_overlap_filter:
             print('Overlap filter not available!')
-# =============================================================================
-#             if day >= 2:
-#                 # Identify plumes that occur > 3 days
-#                 overlap = daily_data[day]['plume_mask'] * daily_data[day-1]['plume_mask'] \
-#                     * daily_data[day-2]['plume_mask']
-#                 valid = np.invert((overlap == 1)).astype(int)
-#                 
-#                 # Remove the values
-#                 validity = lambda x: x * valid
-#                 validity(daily_data[day-2]['plume_mask'])
-#                 validity(daily_data[day-1]['plume_mask'])
-#                 validity(daily_data[day]['plume_mask'])
-#                    
-#             else:
-#                 pass
-#         
-#         # PROBLEM: What if plume occurs 4 consecutive days? 0-3 are deleted,
-#         # next iteration 3 consecutive days are not detected
-# =============================================================================
-        
-    
+
 
         """ 3: Check if plumes overlap with modelled GFED and EDGAR data, by drawing a buffer around TROPOMI data """
+        if compare_gfed_edgar:
+            plumes = GFEDEDGARComparison(plumes, daily_data[day], boundaries, lonres, latres,\
+                                         GFED_path, EDGAR_path, buffersize = params[0])
         
-        # Read GFED and EDGAR data
-        gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data[day]['day'], \
-                                   daily_data[day]['month'], daily_data[day]['year'], lonres, latres)
-        gfed_array[gfed_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
-        
-        edgar_file = 'v432_CO_2012.0.1x0.1.nc' # EDGAR indsutry filename 
-        edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + edgar_file), boundaries, lonres, latres)
-        edgar_array[edgar_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
-
-        
-        gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
-        edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
-        
-        # Draw Buffer around TROPOMI plumes
-        plumes_buffered = raster.DrawCircularBuffer(plumes, radius = params[0]) # Draw circular buffers around TROPOMI plumes
-    
-        # Delete GFED and EDGAR values outside of plume buffer
-        gfed_tropomi = (plumes_buffered * gfed_array) # GFED within TROPOMI
-        gfed_tropomi[gfed_tropomi > 0] = 1
-        edgar_tropomi = (plumes_buffered * edgar_array) # EDGAR within TROPOMI
-        edgar_tropomi[edgar_tropomi > 0] = 1
-        
-        # Adding all arrays with different plume origins:
-        plumes = (plumes + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
-        
-    
-        
-        # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
-           # 11: TROPOMI + GFED identified plume))
-        daily_data[day]['plume_mask'] = plumes
-    
         
         """ 4: Rotate in the wind, to check if plume is detected downwind and not upwind """
         if use_wind_rotations:
             print('Wind rotations not available!')
             # Rotate identified plumes so they will be in line with the wind direction
             # If plume occurs exclusively downwind, it can be validated as plume.
+
+        print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
+
+        # Append to daily data dictionary
+        daily_data[day]['plume_mask'] = plumes
+        
+        return daily_data
+
+
+def GFEDEDGARComparison(plumes, daily_data, boundaries, lonres, latres, \
+                        GFED_path, EDGAR_path, buffersize):
+    # Read GFED and EDGAR data
+    gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data['day'], \
+                               daily_data['month'], daily_data['year'], lonres, latres)
+    gfed_array[gfed_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
     
+    edgar_file = 'v432_CO_2012.0.1x0.1.nc' # EDGAR indsutry filename 
+    edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + edgar_file), boundaries, lonres, latres)
+    edgar_array[edgar_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+
     
-    print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
+    gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
+    edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
     
-    return daily_data
+    # Draw Buffer around TROPOMI plumes
+    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = buffersize) # Draw circular buffers around TROPOMI plumes
+
+    # Delete GFED and EDGAR values outside of plume buffer
+    gfed_tropomi = (plumes_buffered * gfed_array) # GFED within TROPOMI
+    gfed_tropomi[gfed_tropomi > 0] = 1
+    edgar_tropomi = (plumes_buffered * edgar_array) # EDGAR within TROPOMI
+    edgar_tropomi[edgar_tropomi > 0] = 1
+    
+    # Adding all arrays with different plume origins:
+    plumes = (plumes + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
+    
+    # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
+       # 11: TROPOMI + GFED identified plume))
+
+    return plumes
+
+
+
 
 # ========================================================
 # GENERATING OUTPUTS
@@ -234,7 +255,7 @@ def GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, 
     for day in daily_data:
         # Generate text files with plume coordinates
         daily_data_dict = copy.deepcopy(daily_data[day])
-        txt.NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres)
+        #txt.NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres)
         
         # Generate figures (subplots)
         figs.PlotFigures(daily_data[day], basepath, subplots=True)
@@ -249,40 +270,65 @@ def GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, 
     
     return
 
-
-
     
 # ========================================================
 # EXECUTE EVERYTHING IN CORRECT ORDER
 # ========================================================
-def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path, params):
-    # First check if all inputs are valid
-    ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath, GFED_path, EDGAR_path, CAMS_path)
+def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
+                   basepath, GFED_path, EDGAR_path, CAMS_path, \
+                       params, behaviour_settings):
     
+    # First check if all inputs are valid
+    ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
+                   basepath, GFED_path, EDGAR_path, CAMS_path, behaviour_settings)
+    
+    # Notify the algorithm has started
     start = datetime.now()
     print(f'Algorithm started at: {start}')
     print('')
-    print('')
+    print('##########')
     
-    apply_land_sea_mask = True
-    incorporate_cams = True
-    apply_overlap_filter = False
-    use_wind_rotations = False
+    # Redefine model behaviour settings
+    apply_land_sea_mask = behaviour_settings[0]
+    incorporate_cams = behaviour_settings[1]
+    compare_gfed_edgar = behaviour_settings[2]
+    apply_overlap_filter = False # TODO!
+    use_wind_rotations = False # TODO!
+    gen_fig_wind_vector = False
+    if use_wind_rotations:
+        gen_fig_wind_vector = True
     
-    
+    # Initialize some other required parameters
     boundaries, target_lon, target_lat, files = InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath)
-    daily_data = CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_path, apply_land_sea_mask, use_wind_rotations, incorporate_cams)
-    print('')
-    print('')
-    daily_data = Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations, incorporate_cams)
-    print('')
-    print('')
-    GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, gen_fig_wind_vector=False,)
     
+    # Read all required data, and store in dictionary
+    daily_data = CollectingData(boundaries, target_lon, target_lat, files, \
+                                basepath, CAMS_path, apply_land_sea_mask, \
+                                    use_wind_rotations, incorporate_cams)
+    print('##########')
     print('')
+    print('##########')
+    
+    # Execute algorithm itself
+    daily_data = Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, \
+                           lonres, latres, apply_overlap_filter, use_wind_rotations, \
+                               incorporate_cams, compare_gfed_edgar)
+    print('##########')
     print('')
+    print('##########')
+    
+    # Generate outputs
+    GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, \
+                      gen_fig_wind_vector)
+    
+    print('##########')
+    print('')
+    
+    # Notify the algorithm is finished, and how much outputs have been generated
+    print('##########')
     print(f'Algorithm finished at: {start}')
     print(f'Total time elapsed: {datetime.now()-start}')
+    print(f'A total of {len(files)} figures and textfiles were generated at: {basepath}')
     print('')
     
     return daily_data

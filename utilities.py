@@ -85,7 +85,7 @@ def ExportAsCSV(csv_out_path, data):
 
 
 # ==============================================
-# TIME CONVERSION FUNCTION
+# TIME CONVERSION FUNCTIONS
 # ==============================================
 
 def GetCurrentTime():
@@ -146,6 +146,7 @@ def UTCtoModifiedJulianDate(year, month, day, hour, minute, second, millisecond=
     if is_scalar: # if input has been scalars
         result = result.item() # convert result back to scalar
     return result
+
 
 def ModifiedJulianDatetoUTC(mjd):
     """

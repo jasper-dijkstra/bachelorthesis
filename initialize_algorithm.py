@@ -60,19 +60,15 @@ lat_max = 0 #-18 # 0 # maximum latitude
 lonres = 10 # km
 latres = 10 # km
 
-buffersize = 5
-stdevs = 1.6
-windowsize = 180
-stepsize = 30
+# == Model Behaviour Settings == 
+buffersize = 5      # buffersize (radius of buffer around TROPOMI plumes)
+stdevs = 1.6        # st.devs (minimum amount of st.devs within identification frames)
+windowsize = 180    # windowsize (size of moving window frame in grid cells)
+stepsize = 30       # stepsize (steps between each moving window frame in grid cells)
 
-# params = [
-    # buffersize (radius of buffer around TROPOMI plumes),
-    # st.devs (minimum amount of st.devs within identification frames),
-    # windowsize (size of moving window frame in grid cells),
-    # stepsize (steps between each moving window frame in grid cells)
-    # ]
-
-
+landsea = True      # Apply land-sea mask
+cams = True         # Incorporate CAMS
+gfededgar = True    # Compare results to GFED and EDGAR
 
 # == Directories ==
 # Main Directory
@@ -89,5 +85,6 @@ CAMS_path = os.path.join(basepath, '02_Store_CAMS_data' + os.path.sep) # Path to
 
 daily_data = init.PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
                                  basepath, GFED_path, EDGAR_path, CAMS_path, \
-                                 params = [buffersize, stdevs, windowsize, stepsize])
+                                 params = [buffersize, stdevs, windowsize, stepsize], \
+                                     behaviour_settings = [landsea, cams, gfededgar, False, False])
 
