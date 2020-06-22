@@ -51,7 +51,7 @@ import main as init
 
 # == Boundary Conditions and resolutions == 
 # Set the Target Boundaries (degrees)
-lon_min = 100 #120 # 100 # minimum longitude
+lon_min = 100#120 # 100 # minimum longitude
 lon_max = 160 #126  # 160 # maximum longitude
 lat_min = -50 #-24 # -50 # minimum latitude
 lat_max = 0 #-18 # 0 # maximum latitude

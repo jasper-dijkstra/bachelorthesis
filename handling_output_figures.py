@@ -23,7 +23,7 @@ import cartopy.feature as cfeature
 import utilities as ut
 
 
-def PlotFigures(daily_data_dict, basepath, subplots=True):
+def PlotFigures(daily_data_dict, basepath, subplots=True, mask_type = 'plume_mask'):
     """
     Plot figures of:
         - CO concentration as detected by TROPOMI
@@ -49,6 +49,9 @@ def PlotFigures(daily_data_dict, basepath, subplots=True):
     
 
     """
+    
+    # Assert input is valid
+    assert mask_type in ['plume_mask', 'plumes_explained', 'plumes_incl_gfed_edgar'], 'Could not identify the plumes to plot'
     
     # 1: DEFINING OUTPUT NAME AND STORAGE LOCATION
     # Creating output directory
@@ -81,7 +84,7 @@ def PlotFigures(daily_data_dict, basepath, subplots=True):
     # 4:
     # # Correct data, for example if:
         # TROPOMI (1) gfed_tropomi (1) & GFED (10) = 12 -> 11
-    plumes = daily_data_dict['plume_mask']
+    plumes = daily_data_dict[mask_type]
     plumes[plumes == 12] = 11
     plumes[plumes == 102] = 101
     plumes[plumes == 112] = 111

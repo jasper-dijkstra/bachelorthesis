@@ -15,42 +15,33 @@ from scipy import ndimage
 import utilities as ut
 
 
-def GetStats(daily_data_dict):
-    plumes = np.copy(daily_data_dict['plume_mask'].flatten())
-    plumes = plumes[plumes > 0]
-    frequency = np.bincount(plumes)
+def GetStats(daily_data, labeled_plumes, num_features):
     
-    # Make sure frequency has got enough indices to complete this function:
-    append_values = 114 - len(frequency)
-    frequency = np.lib.pad(frequency, ((0,append_values)), 'constant', constant_values=(0))
-
-    total_tropomi = frequency[1] + frequency[12] + frequency[112] + frequency[113] 
+    # Make a copy of the identified plumes
+    plumes = np.copy(daily_data['plumes_explained']) # Get the plumes
     
-    plumes[plumes == 12] = 11
-    plumes[plumes == 102] = 101
-    plumes[plumes == 112] = 111
-# =============================================================================
-#     plumes = daily_data_dict['plume_mask'].flatten()
-#     plumes = plumes[plumes > 0]
-#     frequency = np.bincount(plumes)
-# =============================================================================
-
-    total_tropomi_in_buffer = frequency[1] + frequency[11] + frequency[111]
-    total_tropomi_in_gfed = frequency[11]
-    total_tropomi_in_edgar = frequency[101]
-    total_tropomi_in_edgar_gfed = frequency[111]
-
+    # Initiate list with plume types
+    plumetypes = []
     
-    exp_by_gfed = round(100 * ((total_tropomi_in_gfed + total_tropomi_in_edgar_gfed) / total_tropomi_in_buffer), 1)
-    exp_by_edgar = round(100 * ((total_tropomi_in_edgar + total_tropomi_in_edgar_gfed) / total_tropomi_in_buffer), 1)
-    unexplained = round(100 - exp_by_gfed - exp_by_edgar, 1)
+    for i in range(1,num_features+1): # Loop over all labelled plumes
+        plume = np.copy(labeled_plumes)
+        plume[plume != i] = 0 # Keep only the labelled plume
+        
+        # Retrieve plume value
+        plume_y, plume_x = np.where(plume != 0)
+        plumevalue = plumes[plume_y[0], plume_x[0]]
+        
+        plumetypes.append(int(plumevalue))
+
+    # Get statistics from this information
+    daily_data['explained plumes'] = len(np.array(plumetypes)[np.array(plumetypes) != 1])
+    daily_data['explained by gfed'] = len(np.array(plumetypes)[np.array(plumetypes) == 11])
+    daily_data['explained by edgar'] = len(np.array(plumetypes)[np.array(plumetypes) == 101])
     
-    stats = [total_tropomi, exp_by_gfed, exp_by_edgar, unexplained]
-
-    return stats
+    return daily_data
 
 
-def NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres):
+def NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres, params, compare_gfed_edgar):
     """
     
     Parameters
@@ -75,39 +66,38 @@ def NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres):
     lon_min = daily_data_dict['lon_min']
     lon_max = daily_data_dict['lon_max']
     
-    # Getting statistics on the plumes
-    stats = GetStats(daily_data_dict)
-    
     # Deciding on the nlon_t and nlat_t
     field_t = daily_data_dict['CO_ppb']
     nlon_t = len(field_t[0])
     nlat_t = len(field_t)
     
-    # Group plumes, so they will not be identified as independent cells
-    plumes = daily_data_dict['plume_mask']
+    if compare_gfed_edgar:
+        # Define the plumes
+        plumes = daily_data_dict['plumes_explained']
+        
+        # Label the plumes
+        labels, nlabels = ndimage.label(plumes)
+        
+        # Get some statistics
+        daily_data_dict = GetStats(daily_data_dict, labels, nlabels)
     
-    # Correct the data:
-        # Only TROPOMI plumes must be identified, therefore:
-    plumes[plumes == 10] = 0    # Remove GFED
-    plumes[plumes == 11] = 0    # Remove GFED within TROPOMI buffer
-    plumes[plumes == 100] = 0   # Remove EDGAR
-    plumes[plumes == 101] = 0   # Remove EDGAR within TROPOMI buffer
-    plumes[plumes == 110] = 0   # Remove EDGAR + GFED overlap
-    # Now only TROPOMI plumes whose grid cells directly overlap with EDGAR or GFED-
-    # are left. GFED and EDGAR within TROPOMI bufferzones are deleted
-    # Values: [0 = No plume, 1 = TROPOMI, 12 = TROPOMI & GFED, 102 = TROPOMI & EDGAR
-    # 112 = TROPOMI & GFED & EDGAR]
+    else:
+        # Define the plumes
+        plumes = daily_data_dict['plume_mask']
+        
+        # Label the plumes
+        labels, nlabels = ndimage.label(plumes)
     
-    # Now label the data
-    plumes_0 = plumes > 0 # Define data to be labelled
-    labels, nlabels = ndimage.label(plumes_0) # Label data
-    indices = ndimage.center_of_mass(plumes, labels, np.arange(nlabels) + 1) # Define center of mass of labeled plumes
-    
-    # Get some label statistics
+
+    # Get some label statistics, for file
     max_xco = ndimage.measurements.maximum_position(field_t, labels, np.arange(nlabels) + 1)
     mean_xco_raw = ndimage.measurements.mean(field_t, labels, np.arange(nlabels) + 1)
     mean_xco = [round(num, 3) for num in mean_xco_raw]
     plume_size = ndimage.labeled_comprehension(plumes, labels, np.arange(nlabels) + 1, np.sum, float, 0)
+    unexplained = round((100 - (daily_data_dict['explained plumes'] / nlabels)*100), 2)
+    exp_by_gfed = round(((daily_data_dict['explained by gfed'] / nlabels)*100), 2)
+    exp_by_edgar = round(((daily_data_dict['explained by edgar'] / nlabels)*100), 2)
+
     
     # Generate coordinate meshgrid
     lon_t = np.linspace(lon_min, lon_max, nlon_t)
@@ -119,7 +109,8 @@ def NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres):
     month = daily_data_dict['month']
     year = daily_data_dict['year']
     curr_time = ut.GetCurrentTime()
-    total = len(indices)
+    total = daily_data_dict['total_plumes']
+    bufferarea = round((np.pi*((params[0]*((lonres+latres)/2))**2)), 1)
     filename = os.path.join(coord_directory + \
         'Plume_coordinates_{}_{}_{}.txt'.format(month, day, year))
     
@@ -133,8 +124,8 @@ latitudes: [{lat_min}, {lat_max}]
 
 column descriptions:
 - type:         Plume centre of mass origin: (Unknown, TROPOMI, TROPOMI+GFED, TROPOMI+EDGAR, TROPOMI+GFED+EDGAR)
-- latitude:     Latitude of center of plume
-- longitude:    Longitude of center of plume
+- latitude:     Latitude of northernmost edge of plume
+- longitude:    Longitude of westermost edge of plume
 - grid_cells:   Amount of grid cells (~{lonres}x{latres}km) in plume
 - CO_max:       Highest Carbon Monoxide concentration measured in plume (ppb)
 - CO_average:   Average Carbon Monoxide concentration measured in plume (ppb)
@@ -142,33 +133,45 @@ column descriptions:
 
 Total amount of plumes identified by TROPOMI: {total}
 
-Percentage of TROPOMI plumes that can be explained by GFED: {stats[1]}%
-Percentage of TROPOMI plumes that can be explained by EDGAR: {stats[2]}%
-Percentage of TROPOMI plumes that cannot be explained by EDGAR or GFED:{stats[3]}%
+Percentage of TROPOMI plumes that can be explained by GFED: {exp_by_gfed}%
+Percentage of TROPOMI plumes that can be explained by EDGAR: {exp_by_edgar}%
+Percentage of TROPOMI plumes that cannot be explained by EDGAR or GFED:{unexplained}%
 
 Note: a TROPOMI grid cell can be explained by EDGAR or GFED when an EDGAR or GFED enhancement was detected within
-a circular buffer with radius 7 (~70 km) around a TROPOMI plume.
+a circular buffer with radius {params[0]} (~{bufferarea} km^2) around a TROPOMI plume.
+
+Other parameter settings:
+    Moving window size:             {params[2]}x{params[2]} grid cells
+    Moving window step size:        {params[3]} grid cells
+    Standard deviations treshold:   {params[1]}
 
 #----------------------------------------
 #----------------------------------------
-type; latitude; longitude; grid_cells; CO_max; CO_average;
+plume_origin; latitude; longitude; grid_cells; CO_max; CO_average;
 
 """
     
     f = open(filename, 'w+')
     f.write(headerstring)
 
-    for i in range(len(indices)):
-        x = int(indices[i][1])
-        y = int(indices[i][0])
-        x_co_max = int(max_xco[i][1])
-        y_co_max = int(max_xco[i][0])
-        plume_origin = 'TROPOMI' if (plumes[y,x] == 1) else 'TROPOMI+GFED' \
-            if (plumes[y,x] == 12) else 'TROPOMI+EDGAR' if (plumes[y,x] == 102) \
-                else 'TROPOMI+GFED+EDGAR' if (plumes[y,x] == 112) else 'Unknown origin'
-        f.write(f"{plume_origin}; {lat[y, x]}; {lon[y, x]}; {plume_size[i]}; {round(field_t[y_co_max, x_co_max], 3)}; {mean_xco[i]}\n")
+    for i in range(1,nlabels+1):
+        plume = np.copy(labels)
+        plume[plume != i] = 0 # Keep only the labelled plume
+        
+        # Retrieve plume value
+        y, x = np.where(plume != 0) # Get the indices of the left top corner of plume
+        y = y[0] # Get only northernmost grid cell coordinate
+        x = x[0] # Get only westermost grid cell coordinate
+        
+        x_co_max = int(max_xco[i-1][1])
+        y_co_max = int(max_xco[i-1][0])
+        plume_origin = 'Unknown' if (plumes[y,x] == 1) else 'Wildfire' \
+            if (plumes[y,x] == 11) else 'Anthropogenic' if (plumes[y,x] == 101) \
+                else 'Wildfire/anthropogenic' if (plumes[y,x] == 111) else 'Error'
+        f.write(f"{plume_origin}; {lat[y, x]}; {lon[y, x]}; {plume_size[i-1]}; {round(field_t[y_co_max, x_co_max], 3)}; {mean_xco[i-1]}\n")
     f.close()
     
-    print(f'Generated: {filename}')
+    # Notify a text file has been generated
+    #print(f'Generated: {filename}')
     
     return

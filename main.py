@@ -28,6 +28,7 @@ The rest of the script is built up as follows:
 import os
 import copy
 from datetime import datetime
+from scipy import ndimage
 import numpy as np
 
 # Local imports
@@ -191,9 +192,14 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
 
         """ 3: Check if plumes overlap with modelled GFED and EDGAR data, by drawing a buffer around TROPOMI data """
         if compare_gfed_edgar:
-            plumes = GFEDEDGARComparison(plumes, daily_data[day], boundaries, lonres, latres,\
+            plumes_output = GFEDEDGARComparison(plumes, daily_data[day], boundaries, lonres, latres,\
                                          GFED_path, EDGAR_path, buffersize = params[0])
-        
+            daily_data[day]['plume_mask'] = plumes_output[0]
+            daily_data[day]['plumes_explained'] = plumes_output[1]
+            daily_data[day]['plumes_incl_gfed_edgar'] = plumes_output[2]
+        else:
+            # Append to daily data dictionary
+            daily_data[day]['plume_mask'] = plumes
         
         """ 4: Rotate in the wind, to check if plume is detected downwind and not upwind """
         if use_wind_rotations:
@@ -203,14 +209,47 @@ def Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, lat
 
         print('Total time elapsed executing plume masking algorithm: {}'.format(datetime.now()-start_main))
 
-        # Append to daily data dictionary
-        daily_data[day]['plume_mask'] = plumes
-        
-        return daily_data
+    return daily_data
+
+
+# =============================================================================
+# def GFEDEDGARComparison2(plumes, daily_data, boundaries, lonres, latres, \
+#                         GFED_path, EDGAR_path, buffersize):
+#     # Read GFED and EDGAR data
+#     gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data['day'], \
+#                                daily_data['month'], daily_data['year'], lonres, latres)
+#     gfed_array[gfed_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+#     
+#     edgar_file = 'v432_CO_2012.0.1x0.1.nc' # EDGAR indsutry filename 
+#     edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + edgar_file), boundaries, lonres, latres)
+#     edgar_array[edgar_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
+# 
+#     
+#     gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
+#     edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
+#     
+#     # Draw Buffer around TROPOMI plumes
+#     plumes_buffered = raster.DrawCircularBuffer(plumes, radius = buffersize) # Draw circular buffers around TROPOMI plumes
+# 
+#     # Delete GFED and EDGAR values outside of plume buffer
+#     gfed_tropomi = (plumes_buffered * gfed_array) # GFED within TROPOMI
+#     gfed_tropomi[gfed_tropomi > 0] = 1
+#     edgar_tropomi = (plumes_buffered * edgar_array) # EDGAR within TROPOMI
+#     edgar_tropomi[edgar_tropomi > 0] = 1
+#     
+#     # Adding all arrays with different plume origins:
+#     plumes = (plumes + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
+#     
+#     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
+#        # 11: TROPOMI + GFED identified plume))
+# 
+#     return plumes
+# =============================================================================
 
 
 def GFEDEDGARComparison(plumes, daily_data, boundaries, lonres, latres, \
                         GFED_path, EDGAR_path, buffersize):
+    
     # Read GFED and EDGAR data
     gfed_array = GFED.OpenGFED(GFED_path, boundaries, daily_data['day'], \
                                daily_data['month'], daily_data['year'], lonres, latres)
@@ -220,45 +259,75 @@ def GFEDEDGARComparison(plumes, daily_data, boundaries, lonres, latres, \
     edgar_array = EDGAR.OpenEDGAR(os.path.join(EDGAR_path + edgar_file), boundaries, lonres, latres)
     edgar_array[edgar_array > 0] = 1 # As we are only interested to know if emissions happened, return emissions true(1)/false(0)
 
-    
     gfed_array[gfed_array > 0] = 10     # GFED plumes = 10
     edgar_array[edgar_array > 0] = 100  # EDGAR plumes = 100
     
-    # Draw Buffer around TROPOMI plumes
-    plumes_buffered = raster.DrawCircularBuffer(plumes, radius = buffersize) # Draw circular buffers around TROPOMI plumes
+    # Initiate array with all 'explained' plumes
+    identified_plumes = np.zeros(plumes.shape)
 
-    # Delete GFED and EDGAR values outside of plume buffer
-    gfed_tropomi = (plumes_buffered * gfed_array) # GFED within TROPOMI
-    gfed_tropomi[gfed_tropomi > 0] = 1
-    edgar_tropomi = (plumes_buffered * edgar_array) # EDGAR within TROPOMI
-    edgar_tropomi[edgar_tropomi > 0] = 1
+    # Label plumes
+    labeled_plumes, num_features = ndimage.label(plumes)
+    daily_data['total_plumes'] = num_features
+    print(f"Total plumes identified for {daily_data['day']}/{daily_data['month']}/{daily_data['year']}: {num_features}")
     
-    # Adding all arrays with different plume origins:
-    plumes = (plumes + gfed_array + edgar_array + gfed_tropomi + edgar_tropomi).astype(int)
+    for i in range(1,num_features+1): # Loop over all labelled plumes
+        bufferfield = copy.deepcopy(labeled_plumes)
+        bufferfield[bufferfield != i] = 0 # Keep only the labelled plume
+        
+        # Draw buffer around labelled plume
+        buffer = raster.DrawCircularBuffer(arr = bufferfield, radius = buffersize)
+        
+        # Delete GFED and EDGAR values outside of plume buffer
+        gfed_tropomi = (buffer * gfed_array).astype(int) # GFED within TROPOMI
+        gfed_tropomi = int(sum(gfed_tropomi.flatten())/10)
+        edgar_tropomi = (buffer * edgar_array).astype(int) # EDGAR within TROPOMI
+        edgar_tropomi = int(sum(edgar_tropomi.flatten())/100)
+        
+        # Append GFED and EDGAR explanation value, if GFED or EDGAR falls within buffer
+        if gfed_tropomi > 0:
+            identified_plumes[bufferfield == i] += 10
+        if edgar_tropomi > 0:
+            identified_plumes[bufferfield == i] += 100
+    
+    # Define the three different outputs
+    plumes_tropomi = copy.deepcopy(plumes)
+    plumes_explained = plumes + identified_plumes
+    plumes_incl_gfed_edgar = plumes_explained + gfed_array + edgar_array
+    
+    # Correct invalid values, caused by directly overlapping values
+    plumes_incl_gfed_edgar[plumes_incl_gfed_edgar == 21] = 11 # GFED + TROPOMI
+    plumes_incl_gfed_edgar[plumes_incl_gfed_edgar == 201] = 101 # EDGAR + TROPOMI
+    plumes_incl_gfed_edgar[plumes_incl_gfed_edgar == 121] = 111 # GFED + EDGAR + TROPOMI
+    plumes_incl_gfed_edgar[plumes_incl_gfed_edgar == 211] = 111 # GFED + EDGAR + TROPOMI
     
     # Now: (0: no plume, 1: TROPOMI plume, 10: GFED plume (within bufferzone of TROPOMI plume, \
        # 11: TROPOMI + GFED identified plume))
 
-    return plumes
-
-
+    return plumes_tropomi, plumes_explained, plumes_incl_gfed_edgar
 
 
 # ========================================================
 # GENERATING OUTPUTS
 # ========================================================
 
-def GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, gen_fig_wind_vector):
+def GeneratingOutputs(daily_data, basepath, lonres, latres, params, \
+                      use_wind_rotations, gen_fig_wind_vector, compare_gfed_edgar):
+    
     start_end = datetime.now()
     
     # Generate desired outputs based on earlier set preferences
     for day in daily_data:
         # Generate text files with plume coordinates
         daily_data_dict = copy.deepcopy(daily_data[day])
-        #txt.NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres)
+        txt.NotePlumeCoordinates(daily_data_dict, basepath, lonres, latres, params, compare_gfed_edgar)
         
         # Generate figures (subplots)
-        figs.PlotFigures(daily_data[day], basepath, subplots=True)
+        if compare_gfed_edgar:
+            figs.PlotFigures(daily_data[day], basepath, subplots=True)
+            figs.PlotFigures(daily_data[day], basepath, subplots=True, mask_type = 'plumes_explained')
+            figs.PlotFigures(daily_data[day], basepath, subplots=True, mask_type = 'plumes_incl_gfed_edgar')
+        if not compare_gfed_edgar:
+            figs.PlotFigures(daily_data[day], basepath, subplots=True)
         
         # Generate figures of the wind vectors
         if gen_fig_wind_vector:
@@ -286,7 +355,7 @@ def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
     start = datetime.now()
     print(f'Algorithm started at: {start}')
     print('')
-    print('##########')
+    print('====================')
     
     # Redefine model behaviour settings
     apply_land_sea_mask = behaviour_settings[0]
@@ -305,27 +374,29 @@ def PlumeDetection(lat_min, lat_max, lon_min, lon_max, lonres, latres, \
     daily_data = CollectingData(boundaries, target_lon, target_lat, files, \
                                 basepath, CAMS_path, apply_land_sea_mask, \
                                     use_wind_rotations, incorporate_cams)
-    print('##########')
+        
+    print('====================')
     print('')
-    print('##########')
+    print('====================')
     
     # Execute algorithm itself
     daily_data = Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, \
                            lonres, latres, apply_overlap_filter, use_wind_rotations, \
                                incorporate_cams, compare_gfed_edgar)
-    print('##########')
+        
+    print('====================')
     print('')
-    print('##########')
+    print('====================')
     
     # Generate outputs
-    GeneratingOutputs(daily_data, basepath, lonres, latres, use_wind_rotations, \
-                      gen_fig_wind_vector)
+    GeneratingOutputs(daily_data, basepath, lonres, latres, params, use_wind_rotations, \
+                      gen_fig_wind_vector, compare_gfed_edgar)
     
-    print('##########')
+    print('====================')
     print('')
+    print('====================')
     
     # Notify the algorithm is finished, and how much outputs have been generated
-    print('##########')
     print(f'Algorithm finished at: {start}')
     print(f'Total time elapsed: {datetime.now()-start}')
     print(f'A total of {len(files)} figures and textfiles were generated at: {basepath}')
