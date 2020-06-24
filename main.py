@@ -58,8 +58,8 @@ def InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, b
     
     # Create a list with all files to apply the analysis on
     input_files_directory = os.path.join(basepath + r'00_daily_csv\\')
-    files = ut.ListFilesInDirectory(input_files_directory, maxfiles=4)
-    del files[0:3] # Make sure script only runs for October 13, 2018 #DELETE THIS LATER
+    files = ut.ListFilesInDirectory(input_files_directory, maxfiles=None)
+    #del files[0:3] # Make sure script only runs for October 13, 2018 #DELETE THIS LATER
 
     return boundaries, target_lon, target_lat, files
 
@@ -74,8 +74,10 @@ def ValidateInputs(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath,
     Assert user defined parameters will not raise errors later in the algorithm
     """
     # Assert sure extents fall within boundary
-    assert -180 <= lon_min <= 180 or -180 <= lon_max <= 180 or lon_min <= lon_max, 'maximum longitude cannot be smaller than or equal to minimum, and should be within range (-180, 180)!'
-    assert -90 <= lat_min <= 90 or -90 <= lat_max <= 90 or lat_min <= lat_max, 'maximum latitude cannot be smaller than or equal to minimum, and should be within range (-90, 90)!'
+    assert -180 <= lon_min < 180 and -180 < lon_max <= 180, 'Longitude should be within range -180 -- 180!'
+    assert -90 <= lat_min < 90 and -90 < lat_max <= 90, 'latitude should be within range -90 -- 90!'
+    assert lon_min < lon_max, 'maximum longitude cannot be smaller than or equal to minimum!'
+    assert lat_min < lat_max, 'maximum latitude cannot be smaller than or equal to minimum!'
     
     # Assert resolution is larger than TROPOMI minimum:
     assert lonres > 7, 'TROPOMI minimum longitude resolution is 7 km!'

@@ -131,7 +131,7 @@ def CreatePlumesMap(lon, lat, plumes, out_name):
                         "EDGAR + TROPOMI", "GFED + EDGAR", "GFED + EDGAR + TROPOMI"], \
                            loc='upper center', bbox_to_anchor=(0.5, -0.045), ncol=3, \
                                fancybox=False, shadow=False, frameon=False)
-           
+
     # Save the figure
     plt.savefig(out_name, bbox_inches='tight')#, dpi=1200)
     plt.cla()
@@ -160,7 +160,7 @@ def CreateCOMap(lon, lat, field_mt, out_name):
     cs = plt.pcolormesh(lon, lat, field_mt, cmap='rainbow', transform=ccrs.PlateCarree())
     cbaxes = fig.add_axes([0.2, 0.03, 0.6, 0.03]) 
     cb = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal' )
-    cb.set_label('ppb')
+    cb.set_label('Total CO column mixing ratio (ppb)')
     
     # Save the figure
     fig.savefig(out_name, bbox_inches='tight')#, dpi=1200)
@@ -196,7 +196,7 @@ def SubPlots(lon, lat, data1, data2, out_name):
     cs = plt.pcolormesh(lon, lat, data1, cmap='rainbow', transform=ccrs.PlateCarree())
     cbaxes = fig.add_axes([0.15, -0.01, 0.3, 0.03]) 
     cb1 = plt.colorbar(cs, cax = cbaxes, orientation = 'horizontal')#, fraction=0.046, pad=0.04) 
-    cb1.set_label('ppb')
+    cb1.set_label('Total CO column mixing ratio (ppb)')
     
     # ==============================
     # Plot the plume mask discrete color map
