@@ -7,14 +7,21 @@ Created on Fri Jun 12 14:49:40 2020
 Initialize plume detection algorithm.
 
 Adjust parameters to desired settings:
-    - Target boundries (spatial extent of plume detection)
-    - Target resolutions (grid cell resolution (km) of plume detection raster)
-    - Basepath (folder where outputs i.a. will be stored)
-    - GFED_path (folder where GFED file is stored (i.e. original filename should be retained))
-    - EDGAR_path (folder where EDGAR file is stored (i.e. original filename should be retained))
-    - !NOTE! all data to be used, need to be stored as csv files sorted per day in folder: 
-        _basepath_\00_daily_csv
-
+    - Target boundries: spatial extent of plume detection (lat: -90, 90; lon: -180, 180)
+    - Target resolutions: grid cell resolution (km) of plume detection raster (> 7 km)
+    - Basepath (folder containing inputs and where outputs will be stored)
+    - Model behaviour settings:
+        - Radius of buffer around TROPOMI plumes
+        - Minimum amount of standard deviations within identification frames
+        - Size of moving window frame
+        - Steps between each moving window frame
+        - Ignore all TROPOMI observations above sea
+        - Incorporate CAMS (atmospheric composition) data in algorithm
+        - Incorporate GFED and EDGAR data in the algorithm (to label plume origin)
+    - GFED_path (folder where GFED file is stored)
+    - EDGAR_path (folder where EDGAR file is stored)
+    - CAMS_path (folder where CAMS file(s) are stored)
+    
 
 Outputs generated:
     - daily_data:
@@ -31,11 +38,12 @@ Outputs generated:
             Enhanced data as identified by the algorithm (and GFED and EDGAR data for comparison)
 
 
-Default behaviour of the model (NOTE this can be edited in the main.py script):
-    - Incorporate wind data (False) [i.e. not working propoerly]
-    - Apply overlap filter (filter plumes occuring consecutive days) (False) [i.e. not working propoerly]
-    - Filter TROPOMI observations above oceans (True)
-    - One output figure contains two subplots (CO concentration and plumes), these can also be separated in two different figures
+IMPORTANT NOTES:
+    - Original filenames for GFED and EDGAR data needs to be retained
+    - CAMS data needs to be stored using the format: 'EAC4_m[month]_d[day]_y[year].nc'
+    - All input TROPOMI data needs to be stored as csv files in the folder: _basepath_\00_daily_csv.
+        Use 'process_raw_data_to_daily_csv.py' to convert monthly csv files to daily required for the algorithm
+
 
 """
 
@@ -53,17 +61,17 @@ import main as init
 # Set the Target Boundaries (degrees)
 lon_min = 100 #120 # 100 # minimum longitude
 lon_max = 160 #126  # 160 # maximum longitude
-lat_min = 0 #-24 # -50 # minimum latitude
-lat_max = -510 #-18 # 0 # maximum latitude
+lat_min = -50 #-24 # -50 # minimum latitude
+lat_max = 0 #-18 # 0 # maximum latitude
 
 # Setting the approximate target resolution (> 7)
 lonres = 10 # km
 latres = 10 # km
 
 # == Model Behaviour Settings == 
-buffersize = 5      # buffersize (radius of buffer around TROPOMI plumes)
-stdevs = 1.6        # st.devs (minimum amount of st.devs within identification frames)
-windowsize = 180    # windowsize (size of moving window frame in grid cells)
+buffersize = 4      # buffersize (radius of buffer around TROPOMI plumes)
+stdevs = 1.8        # st.devs (minimum amount of st.devs within identification frames)
+windowsize = 120    # windowsize (size of moving window frame in grid cells)
 stepsize = 30       # stepsize (steps between each moving window frame in grid cells)
 
 landsea = True      # Apply land-sea mask

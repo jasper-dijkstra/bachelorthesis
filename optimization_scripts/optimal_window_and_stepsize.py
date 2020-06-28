@@ -12,80 +12,47 @@ import itertools
 import time
 import numpy as np
 import numpy.ma as ma
+from scipy import ndimage
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 
 # Local imports
 sys.path.append("..") # get one directory up
 import utilities as ut
-import masking_functions as mask
+#import masking_functions as mask
 import main as init
 
 
 # ========================================================
 # FUNCTIONS
 # ========================================================
-def GetTotalLandCells(boundaries, target_lat, target_lon):
-    
-    # Initialize array from data
-    arr = np.ones((target_lat, target_lon))
-    
-    # Count amount of arrays that are land
-    land = mask.land_sea_mask(arr, boundaries)
-    total_land_cells = int(len(land[land != 0]))
-    
-    return total_land_cells
 
 
-def GetStats(daily_data_dict):
-    # Initialize lists to get the average of all data
-    total_tropomi = []
-    total_gfed_edgar = []
-    ext_in_buffer = [] # external databases in buffers
-    explained = []
-    
-    for day in daily_data_dict:
-        plumes = np.copy(daily_data_dict[day]['plume_mask'].flatten())
-        plumes = plumes[plumes > 0]
-        frequency = np.bincount(plumes)
-    
-        # Make sure frequency has got enough indices to complete this function:
-        append_values = 114 - len(frequency)
-        frequency = np.lib.pad(frequency, ((0,append_values)), 'constant', constant_values=(0))
 
-        # append total TROPOMI cells to corresponding list
-        total = frequency[1] + frequency[12] + frequency[112] + frequency[113]
-        total_tropomi.append(total)
+def GetStats(daily_data, labeled_plumes, num_features):
+    
+    # Make a copy of the identified plumes
+    plumes = np.copy(daily_data['plumes_explained']) # Get the plumes
+    
+    # Initiate list with plume types
+    plumetypes = []
+    
+    for i in range(1,num_features+1): # Loop over all labelled plumes
+        plume = np.copy(labeled_plumes)
+        plume[plume != i] = 0 # Keep only the labelled plume
         
-        # append total GFED and EDGAR cells to corresponding list
-        total_gfed_edgar.append(sum(frequency[2:]))
+        # Retrieve plume value
+        plume_y, plume_x = np.where(plume != 0)
+        plumevalue = plumes[plume_y[0], plume_x[0]]
         
-        # append total GFED and EDGAR cells within buffer to corresponding list
-        total_ext_in_buffer = frequency[11] + frequency[12] + frequency[101] \
-            + frequency[102] + frequency[111] + frequency[112]
-        ext_in_buffer.append(total_ext_in_buffer)
-        
-        # Reclass to get other stats as well
-        plumes[plumes == 12] = 11
-        plumes[plumes == 102] = 101
-        plumes[plumes == 112] = 111
+        plumetypes.append(int(plumevalue))
 
-        total_tropomi_in_buffer = frequency[1] + frequency[11] + frequency[111]
-        total_tropomi_in_gfed = frequency[11]
-        total_tropomi_in_edgar = frequency[101]
-        total_tropomi_in_edgar_gfed = frequency[111]
-        
-        # Append total TROPOMI cells that can be explained with the GFED and EDGAR databases
-        exp_by_gfed = round(100 * ((total_tropomi_in_gfed + total_tropomi_in_edgar_gfed) / total_tropomi_in_buffer), 1)
-        exp_by_edgar = round(100 * ((total_tropomi_in_edgar + total_tropomi_in_edgar_gfed) / total_tropomi_in_buffer), 1)
-        explained.append(round((((exp_by_gfed + exp_by_edgar)*total)/100),1))
+    # Get statistics from this information
+    daily_data['explained plumes'] = len(np.array(plumetypes)[np.array(plumetypes) != 1])
+    daily_data['explained by gfed'] = len(np.array(plumetypes)[np.array(plumetypes) == 11])
+    daily_data['explained by edgar'] = len(np.array(plumetypes)[np.array(plumetypes) == 101])
     
-    stats = [np.nanmean(np.array(total_tropomi).astype(int)), \
-             np.nanmean(np.array(explained).astype(int)), \
-                 np.nanmean(np.array(total_gfed_edgar).astype(int)), \
-                     np.nanmean(np.array(ext_in_buffer).astype(int))]
-
-    return stats
+    return daily_data
 
 
 def Plot2D(X, Y, score, xlabel='', ylabel='', cblabel='', colormap='rainbow'):
@@ -143,10 +110,12 @@ basepath = ut.DefineAndCreateDirectory(r'C:\Users\jaspd\Documents\Python\00_bach
 # Directory where GFED files are stored
 GFED_path = os.path.join(basepath, '01_GFED_hdf5_files' + os.path.sep) # Path to gfed .hdf5 files
 EDGAR_path = os.path.join(basepath, '02_EDGAR_files' + os.path.sep) # Path to EDGAR .nc files
+CAMS_path = os.path.join(basepath, '02_Store_CAMS_data' + os.path.sep) # Path to CAMS .nc files
+
 
 # Set modelparams
-windowsizes = list(np.linspace(30, 200, 18).astype(int))
-stepsizes = list(np.linspace(20, 100, 9).astype(int))
+windowsizes = list(np.linspace(100, 200, 11).astype(int))
+stepsizes = list(np.linspace(20, 90, 8).astype(int))
 #buffersizes = list(np.linspace(2, 15, 14).astype(int))
 #stdevs = list(np.round(np.linspace(0.2, 3, 15), 1))
 
@@ -173,11 +142,16 @@ estimate = np.zeros((len(stepsizes), len(windowsizes))) # y (explained/correct T
 starttime = datetime.now()
 print(f'Algorithm started at: {starttime}')
 
-# Model Behaviour settings
+# Redefine model behaviour settings
 apply_land_sea_mask = True
-apply_overlap_filter = False
-use_wind_rotations = False
-
+incorporate_cams = True
+compare_gfed_edgar = True
+apply_overlap_filter = False # TODO!
+use_wind_rotations = False # TODO!
+gen_fig_wind_vector = False
+if use_wind_rotations:
+    gen_fig_wind_vector = True
+    
 # Initialize other required parameters
 boundaries, target_lon, target_lat, files = init.InitializingParameters(lat_min, lat_max, lon_min, lon_max, lonres, latres, basepath)
 
@@ -189,7 +163,7 @@ for i in range(20):
     breaks += start
 
 # Read/open the data
-daily_data = init.CollectingData(boundaries, target_lon, target_lat, files, basepath, apply_land_sea_mask, use_wind_rotations)
+daily_data = init.CollectingData(boundaries, target_lon, target_lat, files, basepath, CAMS_path, apply_land_sea_mask, use_wind_rotations, incorporate_cams)
 
 # Iterate over all model parameter combinations
 for count, i in enumerate(iterations):
@@ -199,21 +173,27 @@ for count, i in enumerate(iterations):
         # windowsize (size of moving window frame in grid cells),
         # stepsize (steps between each moving window frame in grid cells)
         # ]
-    params = [5, 1, i[1], i[0]]
+    params = [5, 1.6, i[1], i[0]]
     
     # Detection algorithm
-    daily_data = init.Detection(params, daily_data, boundaries, GFED_path, EDGAR_path, lonres, latres, apply_overlap_filter, use_wind_rotations)
+    daily_data = init.Detection(params, daily_data, boundaries, GFED_path, \
+                                EDGAR_path, lonres, latres, apply_overlap_filter, \
+                                    use_wind_rotations, incorporate_cams, \
+                                        compare_gfed_edgar)
+    
+    # Label the plumes
+    labels, nlabels = ndimage.label(daily_data[0]['plumes_explained'])
     
     # Retrieve statistics from plume detection result
-    stats = GetStats(daily_data)
+    stats = GetStats(daily_data[0], labels, nlabels)
     
     # Identify locations indices to place data in array
     x = np.where(stepsizes == iterations[count][0])[0]
     y = np.where(windowsizes == iterations[count][1])[0]
     
     # Append these statistics to array
-    estimator[x,y] = stats[0]
-    estimate[x,y] = stats[1]
+    estimator[x,y] = daily_data[0]['total_plumes']
+    estimate[x,y] = daily_data[0]['explained plumes']
     
     # Print progress update to console (steps of 5%)
     if count in breaklist:
@@ -229,17 +209,15 @@ print(f'Total time elapsed: {datetime.now()-starttime}')
 X, Y = np.meshgrid(windowsizes, stepsizes)
 
 # Where is difference TROPOMI and EXPLAINED the smallest -> Root mean square deviation?
-difference = estimator-estimate # Should negative values be filtered?
-RMSD = np.sqrt(((difference)**2)/GetTotalLandCells(boundaries, target_lat, target_lon))
+difference = estimator-estimate
+RMSD = np.sqrt(np.divide(((difference)**2),estimator, where=estimator!=0))
 
+# Tips from Sander (score function)
+y_pos = estimate # positive identifications
+y_neg = estimator-estimate # negative identifications
+bufferarea = np.pi * (Y**2)
 
-# Tips from Sander (socre function)
-y_tot = stats[2] # total sources according to edgar + gfed
-y_pos = estimator # total identifications
-y_neg = estimator-estimate # total non-explained identifications
-#y_neg[y_neg <= 0] = 0 # Remove negative combinations -> more cells explained than identified?
-
-score = (y_pos - y_neg) #/ (Y)
+score = (y_pos - y_neg) / bufferarea
 
 # ============= CREATE OUTPUTS ==============
 # Store data as csv's
@@ -251,9 +229,8 @@ xlabel = 'window length and width (x10 km)'
 ylabel = 'window step size (x10 km)'
 cblabel = 'RMSD'
 
-Plot2D(X, Y, ma.array(RMSD, mask=(score == 0)), xlabel=xlabel, ylabel=ylabel, cblabel=cblabel)
+Plot2D(X, Y, ma.array(RMSD, mask=(RMSD == 0)), xlabel=xlabel, ylabel=ylabel, cblabel=cblabel)
 
 # Now also plot score function
 cblabel = 'score'
 Plot2D(X, Y, ma.array(score, mask=(score == 0)), xlabel=xlabel, ylabel=ylabel, cblabel=cblabel, colormap='RdYlGn')
-#Plot2D(X, Y, ma.array(score, mask=(y_neg == 0)), xlabel=xlabel, ylabel=ylabel, cblabel=cblabel, colormap='RdYlGn')
