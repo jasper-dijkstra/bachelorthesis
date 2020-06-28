@@ -14,12 +14,33 @@ https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-reanalysis-eac
 
 
 from netCDF4 import Dataset
+import netCDF4
 import numpy as np
 import os
 
 # Local imports
 import raster_tools as raster
 
+
+def GetCorrectOutput(fid, day, month):
+    """
+    Temporary function to open CAMS netCDF file supplied by Sander
+    """
+
+    # initialize time coversion
+    time = fid.variables['time']
+    date = netCDF4.num2date(time[:], time.units, time.calendar)
+    months = np.zeros(date.shape)
+    days = np.zeros(date.shape)
+    for i in range(len(date)):
+        months[i] = date[i].month
+        days[i] = date[i].day
+    
+    # Only get the required indices
+    indices = np.where((days == day) & (months == month))
+    CO_level = fid.variables['co'][indices[0],:,:,:]
+    
+    return CO_level
 
 
 
@@ -38,7 +59,7 @@ def CAMSWeights():
     return weights
 
 
-def OpenCAMS(path, bbox, xres, yres):
+def OpenCAMS(path, bbox, xres, yres, day, month):
     
     # EDGAR longitudes range from 0-360, while TROPOMI does -180-180
     # Therefore apply correction to bbox    
@@ -52,7 +73,8 @@ def OpenCAMS(path, bbox, xres, yres):
     lat = fid.variables['latitude'][:]
     
     # Get CO level, and take the mean in all dimensions, until lat/lon dimensions are left
-    CO_level = fid.variables['co'][:] # 4-dimensions: [hours, model_level, lat, lon]
+    #CO_level = fid.variables['co'][:] # 4-dimensions: [hours, model_level, lat, lon]
+    CO_level = GetCorrectOutput(fid, day, month)
     
     # Take mean of time and atmospheric height dimensions, so only lat/lon (2D) are left
     CO_level = np.mean(CO_level, axis=0)
@@ -126,14 +148,15 @@ def FetchCams(CAMS_path, dates, bbox, xres, yres):
     
     # For now, just open file without API
     # target file
-    file = os.path.join(CAMS_path + os.path.sep + rf'EAC4_m{month}_d{day}_y{year}.nc')
+    #file = os.path.join(CAMS_path + os.path.sep + rf'EAC4_m{month}_d{day}_y{year}.nc')
+    file = os.path.join(CAMS_path + os.path.sep + rf'download.nc')
     
     if not os.path.isfile(file):
         print('CAMS file was not found!')
         print('Proceeding algorithm without CAMS')
         return
     
-    CO_level = OpenCAMS(file, bbox, xres, yres)
+    CO_level = OpenCAMS(file, bbox, xres, yres, day, month)
     
     return CO_level
 
